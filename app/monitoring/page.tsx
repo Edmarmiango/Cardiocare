@@ -1,83 +1,83 @@
 "use client"
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Button } from "../../components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card"
-import { Input } from "../../components/ui/input"
-import { Label } from "../../components/ui/label"
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts'
+import { toast } from "../../components/ui/use-toast"
+import { HealthDataInput } from "../../components/HealthDataInput"
+import { HealthDataChart } from "../../components/HealthDataChart"
+import { ShareHealthData } from "../../components/ShareHealthData"
+
+interface HealthData {
+  date: string;
+  systolic: number;
+  diastolic: number;
+  heartRate: number;
+  glucose: number;
+  cholesterol: number;
+}
 
 export default function Monitoring() {
-  const [bloodPressure, setBloodPressure] = useState<string>("")
-  const [heartRate, setHeartRate] = useState<string>("")
+  const [healthData, setHealthData] = useState<HealthData[]>([])
 
-  const [data, setData] = useState<Array<{
-    date: string;
-    bloodPressure: number;
-    heartRate: number;
-  }>>([
-    { date: '2023-11-01', bloodPressure: 120, heartRate: 72 },
-    { date: '2023-11-02', bloodPressure: 118, heartRate: 70 },
-    { date: '2023-11-03', bloodPressure: 122, heartRate: 74 },
-  ])
+  useEffect(() => {
+    fetchHealthData()
+  }, [])
 
-  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
-    const newData = {
-      date: new Date().toISOString().split('T')[0],
-      bloodPressure: parseInt(bloodPressure),
-      heartRate: parseInt(heartRate)
+  const fetchHealthData = async () => {
+    try {
+      const response = await fetch('/api/health-data')
+      if (response.ok) {
+        const data = await response.json()
+        setHealthData(data)
+      } else {
+        throw new Error('Failed to fetch health data')
+      }
+    } catch (error) {
+      console.error('Error fetching health data:', error)
+      toast({
+        title: "Error",
+        description: "Failed to fetch health data",
+        variant: "destructive",
+      })
     }
-    setData([...data, newData])
-    setBloodPressure("")
-    setHeartRate("")
+  }
+
+  const handleNewData = (newData: HealthData) => {
+    setHealthData([...healthData, newData])
   }
 
   return (
-    <div className="space-y-8">
+    <div className="container mx-auto p-4 space-y-8">
+      <h1 className="text-2xl font-bold mb-4">Monitoramento de Saúde</h1>
+      
       <Card>
         <CardHeader>
-          <CardTitle>Monitoramento de Saúde</CardTitle>
+          <CardTitle>Adicionar Novos Dados</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="mb-8">
-            <h2 className="text-xl font-semibold mb-4">Seus Dados de Saúde</h2>
-            <LineChart width={600} height={300} data={data}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="date" />
-              <YAxis yAxisId="left" />
-              <YAxis yAxisId="right" orientation="right" />
-              <Tooltip />
-              <Legend />
-              <Line yAxisId="left" type="monotone" dataKey="bloodPressure" stroke="#8884d8" name="Pressão Arterial" />
-              <Line yAxisId="right" type="monotone" dataKey="heartRate" stroke="#82ca9d" name="Frequência Cardíaca" />
-            </LineChart>
-          </div>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <Label htmlFor="bloodPressure">Pressão Arterial (sistólica)</Label>
-              <Input 
-                id="bloodPressure" 
-                type="number" 
-                value={bloodPressure}
-                onChange={(e) => setBloodPressure(e.target.value)}
-                required 
-              />
-            </div>
-            <div>
-              <Label htmlFor="heartRate">Frequência Cardíaca</Label>
-              <Input 
-                id="heartRate" 
-                type="number" 
-                value={heartRate}
-                onChange={(e) => setHeartRate(e.target.value)}
-                required 
-              />
-            </div>
-            <Button type="submit">Adicionar Dados</Button>
-          </form>
+          <HealthDataInput onSubmit={handleNewData} />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Seus Dados de Saúde</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <HealthDataChart data={healthData} />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Compartilhar Dados</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ShareHealthData />
         </CardContent>
       </Card>
     </div>
   )
 }
+

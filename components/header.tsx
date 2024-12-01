@@ -56,6 +56,7 @@ export function Header() {
  }
 
  // Renderiza navegação para outros usuários
+ if (session?.user?.role === 'DOCTOR') {
  return (
    <header className="w-full border-b">
      <div className="container mx-auto flex h-16 items-center justify-between px-4">
@@ -73,15 +74,17 @@ export function Header() {
              <Link href="/prediction" className="text-sm font-medium">
                Predição
              </Link>
-             <Link href="/monitoring" className="text-sm font-medium">
-               Monitoramento
-             </Link>
              <Link href="/prescriptions" className="text-sm font-medium">
                Prescrições
              </Link>
              <Link href="/telemedicine" className="text-sm font-medium">
                Telemedicina
              </Link>
+             {status === 'authenticated' && session.user.role === 'DOCTOR' && (
+            <Link href="/doctor/shared-health-data" className="text-sm font-medium">
+              Dados Compartilhados
+            </Link>
+          )}
              <Button variant="outline" onClick={handleSignOut}>
                Sair
              </Button>
@@ -99,7 +102,55 @@ export function Header() {
        </nav>
      </div>
    </header>
- )
+ )}
+
+
+ // Renderiza navegação para outros usuários
+ return (
+  <header className="w-full border-b">
+    <div className="container mx-auto flex h-16 items-center justify-between px-4">
+      <Link href="/" className="flex items-center">
+        <span className="text-2xl font-bold">CardioCare</span>
+      </Link>
+
+      <nav className="flex items-center gap-6">
+        <Link href="/" className="text-sm font-medium">
+          Home
+        </Link>
+        
+        {status === 'authenticated' ? (
+          <>
+            <Link href="/prediction" className="text-sm font-medium">
+              Predição
+            </Link>
+            <Link href="/monitoring" className="text-sm font-medium">
+              Monitoramento
+            </Link>
+            <Link href="/prescriptions" className="text-sm font-medium">
+              Prescrições
+            </Link>
+            <Link href="/telemedicine" className="text-sm font-medium">
+              Telemedicina
+            </Link>
+            <Button variant="outline" onClick={handleSignOut}>
+              Sair
+            </Button>
+          </>
+        ) : (
+          <>
+            <Button variant="ghost" asChild>
+              <Link href="/register">Registrar-se</Link>
+            </Button>
+            <Button variant="outline" asChild>
+              <Link href="/login">Entrar</Link>
+            </Button>
+          </>
+        )}
+      </nav>
+    </div>
+  </header>
+)
 }
+
 
 

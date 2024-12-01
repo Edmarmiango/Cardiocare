@@ -27,9 +27,12 @@ model User {
   bi            String?
   appointments       Appointment[]
   doctorAppointments Appointment[] @relation("DoctorAppointments")
+  schedules DoctorSchedule[]
   prescriptions      Prescription[]
   healthData         HealthData[]
   notifications      Notification[]
+  prescriptionsGiven Prescription[] @relation("DoctorPrescriptions")
+  timeSlots TimeSlot[]
 }
 
 model Appointment {
@@ -40,20 +43,26 @@ model Appointment {
   doctor    User     @relation("DoctorAppointments", fields: [doctorId], references: [id])
   date      DateTime
   meetLink  String?
+  status    AppointmentStatus @default(SCHEDULED)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  cancelReason String?
 }
 
 model Prescription {
   id           String   @id @default(cuid())
-  userId       String
-  user         User     @relation(fields: [userId], references: [id])
   medication   String
   dosage       String
   frequency    String
   instructions String
+  startDate    DateTime
+  endDate      DateTime?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+  user         User     @relation(fields: [userId], references: [id])
+  userId       String
+  doctor       User     @relation("DoctorPrescriptions", fields: [doctorId], references: [id])
+  doctorId     String
 }
 
 model HealthData {
@@ -78,6 +87,34 @@ model Notification {
   updatedAt DateTime @updatedAt
 }
 
+model DoctorSchedule {
+  id        String   @id @default(cuid())
+  doctorId  String
+  doctor    User     @relation(fields: [doctorId], references: [id])
+  dayOfWeek Int
+  startTime String
+  endTime   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([doctorId, dayOfWeek])
+}
+
+model TimeSlot {
+  id        String   @id @default(cuid())
+  doctorId  String
+  doctor    User     @relation(fields: [doctorId], references: [id])
+  date      DateTime
+  startTime String
+  endTime   String
+  isBooked  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([doctorId, date, startTime, endTime])
+}
+
+
 enum Role {
   ADMIN
   DOCTOR
@@ -95,4 +132,11 @@ enum NotificationType {
   MEDICATION_REMINDER
   HEALTH_DATA_ALERT
 }
+
+enum AppointmentStatus {
+  SCHEDULED
+  COMPLETED
+  CANCELLED
+}
+
 

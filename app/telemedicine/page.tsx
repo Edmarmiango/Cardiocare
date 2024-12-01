@@ -1,139 +1,195 @@
-"use client"
+'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "../../components/ui/dialog"
+import { Textarea } from "../../components/ui/textarea"
+import { format, parseISO, addMinutes } from 'date-fns'
 import { Button } from "../../components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card"
-import { Input } from "../../components/ui/input"
-import { Label } from "../../components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select"
 import { toast } from "../../components/ui/use-toast"
-
+import { fetchAppointments } from "../../services/appointments"
+import { AppointmentStatus, Role } from "../types"
+import { useSession } from "next-auth/react"
+import { GoogleMeetIntegration } from "../../components/GoogleMeetIntegration"
+import { DoctorScheduleManager } from '../../components/DoctorScheduleManager'
+import { AppointmentBooking } from '../../components/AppointmentBooking'
 
 interface Appointment {
-  id: number;
-  doctor: string;
+  id: string;
   date: string;
-  time: string;
+  meetLink: string | null;
+  status: AppointmentStatus;
+  doctor: {
+    name: string;
+  };
+  user: {
+    name: string;
+  };
+  cancelReason?: string;
 }
 
-const doctors = [
-  "Dra. Maria Santos",
-  "Dr. João Silva",
-  "Dra. Ana Oliveira",
-  "Dr. Carlos Ferreira"
-]
+const updateAppointmentStatus = async (appointmentId: string, status: AppointmentStatus, cancelReason?: string) => {
+  try {
+    const response = await fetch('/api/appointments', {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ appointmentId, status, cancelReason }),
+    })
 
-export default function Telemedicine() {
-  const [appointments, setAppointments] = useState<Appointment[]>([
-    { id: 1, doctor: "Dra. Maria Santos", date: "2023-12-01", time: "14:00" },
-    { id: 2, doctor: "Dr. João Silva", date: "2023-12-03", time: "10:30" },
-  ])
-
-  const [newAppointment, setNewAppointment] = useState({
-    doctor: "",
-    date: "",
-    time: ""
-  })
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target
-    setNewAppointment(prev => ({ ...prev, [name]: value }))
-  }
-
-  const handleDoctorChange = (value: string) => {
-    setNewAppointment(prev => ({ ...prev, doctor: value }))
-  }
-
-  const handleSubmit = (event: React.FormEvent) => {
-    event.preventDefault()
-    if (!newAppointment.doctor || !newAppointment.date || !newAppointment.time) {
+    if (response.ok) {
       toast({
-        title: "Erro",
-        description: "Por favor, preencha todos os campos.",
+        title: "Success",
+        description: `Appointment ${status.toLowerCase()} successfully`,
+      })
+      return true
+    } else {
+      throw new Error('Failed to update appointment status')
+    }
+  } catch (error) {
+    console.error('Error updating appointment status:', error)
+    toast({
+      title: "Error",
+      description: "Failed to update appointment status",
+      variant: "destructive",
+    })
+    return false
+  }
+}
+
+export default function TelemedicinePage() {
+  const { data: session } = useSession()
+  const [appointments, setAppointments] = useState<Appointment[]>([])
+
+  const fetchAppointmentsData = useCallback(async () => {
+    try {
+      const appointmentsData = await fetchAppointments()
+      setAppointments(appointmentsData)
+    } catch (error) {
+      console.error('Error fetching appointments:', error)
+      toast({
+        title: "Error",
+        description: "Failed to fetch appointments",
         variant: "destructive",
       })
-      return
     }
+  }, [])
 
-    const newAppointmentObj = {
-      id: appointments.length + 1,
-      ...newAppointment
+  useEffect(() => {
+    fetchAppointmentsData()
+  }, [fetchAppointmentsData])
+
+  const joinMeeting = (meetLink: string) => {
+    window.open(meetLink, '_blank')
+  }
+
+  const [cancelReason, setCancelReason] = useState('')
+
+  const handleComplete = useCallback(async (appointmentId: string) => {
+    const success = await updateAppointmentStatus(appointmentId, AppointmentStatus.COMPLETED)
+    if (success) {
+      fetchAppointmentsData()
     }
-    setAppointments([...appointments, newAppointmentObj])
-    setNewAppointment({ doctor: "", date: "", time: "" })
-    toast({
-      title: "Consulta Agendada",
-      description: "Sua nova consulta foi agendada com sucesso.",
-    })
+  }, [fetchAppointmentsData])
+
+  const handleCancel = useCallback(async (appointmentId: string) => {
+    const success = await updateAppointmentStatus(appointmentId, AppointmentStatus.CANCELLED, cancelReason)
+    if (success) {
+      fetchAppointmentsData()
+      setCancelReason('')
+    }
+  }, [fetchAppointmentsData, cancelReason])
+
+  const formatAppointmentDate = (dateString: string) => {
+    try {
+      const date = parseISO(dateString)
+      return format(date, 'PPpp') // e.g. "Apr 29, 2023, 9:30 AM"
+    } catch (error) {
+      console.error('Error formatting date:', error)
+      return dateString
+    }
   }
 
   return (
-    <div className="space-y-8">
-      <Card>
-        <CardHeader>
-          <CardTitle>Telemedicina</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <h2 className="text-xl font-semibold mb-4">Suas Consultas</h2>
-          {appointments.map((appointment) => (
-            <div key={appointment.id} className="mb-4 p-4 border rounded">
-              <p><strong>Médico:</strong> {appointment.doctor}</p>
-              <p><strong>Data:</strong> {appointment.date}</p>
-              <p><strong>Hora:</strong> {appointment.time}</p>
-              <Button className="mt-2">Entrar na Consulta</Button>
-            </div>
-          ))}
-        </CardContent>
-      </Card>
+    <div className="container mx-auto p-4">
+      <h1 className="text-2xl font-bold mb-4">Telemedicine</h1>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Agendar Nova Consulta</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <Label htmlFor="doctor">Médico</Label>
-              <Select name="doctor" value={newAppointment.doctor} onValueChange={handleDoctorChange}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione um médico" />
-                </SelectTrigger>
-                <SelectContent>
-                  {doctors.map((doctor) => (
-                    <SelectItem key={doctor} value={doctor}>{doctor}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label htmlFor="date">Data</Label>
-              <Input 
-                id="date" 
-                name="date"
-                type="date" 
-                value={newAppointment.date}
-                onChange={handleInputChange}
-                required 
-              />
-            </div>
-            <div>
-              <Label htmlFor="time">Hora</Label>
-              <Input 
-                id="time" 
-                name="time"
-                type="time" 
-                value={newAppointment.time}
-                onChange={handleInputChange}
-                required 
-              />
-            </div>
-            <Button type="submit">Agendar Consulta</Button>
-          </form>
-        </CardContent>
-      </Card>
+      {session?.user?.role === Role.PATIENT && (
+        <div className="mb-8">
+          <AppointmentBooking onAppointmentCreated={fetchAppointmentsData} />
+        </div>
+      )}
+
+      {session?.user?.role === Role.DOCTOR && (
+        <div className="mb-8">
+          <DoctorScheduleManager />
+        </div>
+      )}
+
+      <h2 className="text-xl font-semibold mb-4">Your Appointments</h2>
+      {appointments.length > 0 ? (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {appointments.map((appointment) => (
+            <Card key={appointment.id}>
+              <CardHeader>
+                <CardTitle>{session?.user?.role === Role.PATIENT ? `Dr. ${appointment.doctor.name}` : appointment.user.name}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p>
+                  <strong>Date:</strong> {format(parseISO(appointment.date), 'PPP')}
+                  <br />
+                  <strong>Time:</strong> {format(parseISO(appointment.date), 'HH:mm')} - {format(addMinutes(parseISO(appointment.date), 30), 'HH:mm')}
+                </p>
+                <p><strong>Status:</strong> {appointment.status}</p>
+                {appointment.status === AppointmentStatus.SCHEDULED && (
+                  <>
+                    {appointment.meetLink ? (
+                      <Button onClick={() => joinMeeting(appointment.meetLink!)} className="mt-2 mr-2">
+                        Join Meeting
+                      </Button>
+                    ) : (
+                      <GoogleMeetIntegration appointmentId={appointment.id} />
+                    )}
+                    {session?.user?.role === Role.DOCTOR && (
+                      <Button onClick={() => handleComplete(appointment.id)} className="mt-2 mr-2">
+                        Mark as Completed
+                      </Button>
+                    )}
+                    <Dialog>
+                      <DialogTrigger asChild>
+                        <Button variant="destructive" className="mt-2">Cancel</Button>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>Cancel Appointment</DialogTitle>
+                        </DialogHeader>
+                        <Textarea
+                          placeholder="Reason for cancellation"
+                          value={cancelReason}
+                          onChange={(e) => setCancelReason(e.target.value)}
+                        />
+                        <Button onClick={() => handleCancel(appointment.id)} variant="destructive">
+                          Confirm Cancellation
+                        </Button>
+                      </DialogContent>
+                    </Dialog>
+                  </>
+                )}
+                {appointment.status === AppointmentStatus.CANCELLED && appointment.cancelReason && (
+                  <p><strong>Cancellation Reason:</strong> {appointment.cancelReason}</p>
+                )}
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      ) : (
+        <p>No appointments found.</p>
+      )}
     </div>
   )
 }
+
 
 
 

@@ -6,13 +6,13 @@ const newsDatabase = [
     id: '1',
     title: 'Novos Avanços no Tratamento de Insuficiência Cardíaca',
     summary: 'Pesquisadores descobrem terapia promissora para pacientes com insuficiência cardíaca avançada.',
-    imageUrl: '/images/news/heart-treatment.jpg'
+    imageUrl: '/images/3.jpg'
   },
   {
     id: '2',
     title: 'Dieta Mediterrânea e Saúde do Coração',
     summary: 'Estudo confirma benefícios da dieta mediterrânea na prevenção de doenças cardiovasculares.',
-    imageUrl: '/images/news/mediterranean-diet.jpg'
+    imageUrl: '/images/5.jpg'
   },
   // Add more news items as needed
 ]

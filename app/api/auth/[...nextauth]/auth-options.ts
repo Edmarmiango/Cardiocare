@@ -10,21 +10,23 @@ export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
   providers: [
     CredentialsProvider({
-      name: "credentials",
+      name: 'Credentials',
       credentials: {
-        email: { label: "Email", type: "email" },
+        email: { label: "Email", type: "text" },
         password: { label: "Password", type: "password" }
       },
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) {
           return null
         }
-
         const user = await prisma.user.findUnique({
           where: { email: credentials.email }
         })
-
-        if (!user) {
+        if (!user || !user.password) {
+          return null
+        }
+        const isPasswordValid = await bcrypt.compare(credentials.password, user.password)
+        if (!isPasswordValid) {
           return null
         }
 
@@ -33,20 +35,12 @@ export const authOptions: NextAuthOptions = {
           throw new Error('Sua conta ainda não foi aprovada')
         }
 
-        const isPasswordValid = await bcrypt.compare(
-          credentials.password,
-          user.password!
-        )
-
-        if (!isPasswordValid) {
-          return null
-        }
-
         return {
           id: user.id,
-          email: user.email,
           name: user.name,
+          email: user.email,
           role: user.role,
+          status: user.status
         }
       }
     })
@@ -54,24 +48,34 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
+        token.id = user.id
         token.role = user.role
+        token.status = user.status
       }
       return token
     },
     async session({ session, token }) {
-      if (session?.user) {
-        session.user.role = token.role as string
+      if (token && session.user) {
+        session.user.id = token.id as string
+        session.user.role = token.role as Role
+        session.user.status = token.status as UserStatus
       }
       return session
     }
   },
   pages: {
     signIn: '/login',
+    signOut: '/logout-success',
   },
   session: {
     strategy: "jwt",
-    maxAge: 30 * 24 * 60 * 60, // 30 days
+    maxAge: 3600, // Expira após 1 hora
   },
 }
+
+
+
+
+
 
 

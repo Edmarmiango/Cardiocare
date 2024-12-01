@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Bell } from 'lucide-react'
-import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
+import { Button } from "../components/ui/button"
+import { Card, CardContent } from "../components/ui/card"
 import { useSession } from "next-auth/react"
 
 export function NotificationCenter() {

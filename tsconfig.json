@@ -117,7 +117,7 @@
     ".next/types/**/*.ts",
     "**/*.ts",
     "**/*.tsx"
-  ],
+, "scripts/getGoogleRefreshToken.mjs"  ],
   "exclude": [
     "node_modules"
   ]

@@ -5,6 +5,7 @@ import { useSession, signOut } from "next-auth/react"
 import { Button } from "../components/ui/button"
 import { useEffect } from "react"
 import { useRouter } from "next/navigation"
+import { MessageCircle } from 'lucide-react'
 
 export function Header() {
  const { data: session, status } = useSession()
@@ -80,10 +81,15 @@ export function Header() {
              <Link href="/telemedicine" className="text-sm font-medium">
                Telemedicina
              </Link>
+             <Link href="/chat" className="text-sm font-medium flex items-center">
+               <MessageCircle className="mr-2 h-4 w-4" />
+               Chat Seguro
+             </Link>
              {status === 'authenticated' && session.user.role === 'DOCTOR' && (
             <Link href="/doctor/shared-health-data" className="text-sm font-medium">
               Dados Compartilhados
             </Link>
+            
           )}
              <Button variant="outline" onClick={handleSignOut}>
                Sair
@@ -132,6 +138,10 @@ export function Header() {
             <Link href="/telemedicine" className="text-sm font-medium">
               Telemedicina
             </Link>
+            <Link href="/chat" className="text-sm font-medium flex items-center">
+               <MessageCircle className="mr-2 h-4 w-4" />
+               Chat Seguro
+             </Link>
             <Button variant="outline" onClick={handleSignOut}>
               Sair
             </Button>

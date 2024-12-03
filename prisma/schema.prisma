@@ -35,6 +35,8 @@ model User {
   timeSlots TimeSlot[]
   sharedDataAsPatient SharedHealthData[] @relation("PatientSharedData")
   sharedDataAsDoctor  SharedHealthData[] @relation("DoctorSharedData")
+  sentMessages     Message[] @relation("SentMessages")
+  receivedMessages Message[] @relation("ReceivedMessages")
 }
 
 model Appointment {
@@ -154,4 +156,16 @@ enum AppointmentStatus {
   CANCELLED
 }
 
+model Message {
+  id         String   @id @default(cuid())
+  content    String
+  senderId   String
+  sender     User     @relation("SentMessages", fields: [senderId], references: [id])
+  receiverId String
+  receiver   User     @relation("ReceivedMessages", fields: [receiverId], references: [id])
+  createdAt  DateTime @default(now())
+  isRead     Boolean  @default(false)
+  fileUrl    String?
+  fileType   String?
+}
 

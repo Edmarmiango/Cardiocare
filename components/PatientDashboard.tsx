@@ -1,7 +1,47 @@
+'use client'
+import { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card"
 import Link from "next/link"
+import { useSession } from "next-auth/react"
+import { toast } from "../components/ui/use-toast"
+
+interface Reminder {
+  id: string
+  type: string
+  title: string
+  description: string
+  datetime: string
+}
 
 export default function PatientDashboard() {
+  const { data: session } = useSession()
+  const [reminders, setReminders] = useState<Reminder[]>([])
+
+  useEffect(() => {
+    const fetchReminders = async () => {
+      try {
+        const response = await fetch('/api/reminders')
+        if (response.ok) {
+          const data = await response.json()
+          setReminders(data)
+        } else {
+          throw new Error('Failed to fetch reminders')
+        }
+      } catch (error) {
+        console.error('Error fetching reminders:', error)
+        toast({
+          title: "Error",
+          description: "Failed to load reminders",
+          variant: "destructive",
+        })
+      }
+    }
+
+    if (session?.user) {
+      fetchReminders()
+    }
+  }, [session])
+
   return (
     <div className="container mx-auto p-4">
       <h1 className="text-2xl font-bold mb-4">Bem-vindo, Paciente</h1>
@@ -50,8 +90,30 @@ export default function PatientDashboard() {
             </Link>
           </CardContent>
         </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>Seus Lembretes</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {reminders.length > 0 ? (
+              <ul className="space-y-2">
+                {reminders.map((reminder) => (
+                  <li key={reminder.id} className="flex justify-between items-center">
+                    <span>{reminder.title}</span>
+                    <span className="text-sm text-gray-500">
+                      {new Date(reminder.datetime).toLocaleString()}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p>Você não tem lembretes no momento.</p>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </div>
   )
 }
+
 

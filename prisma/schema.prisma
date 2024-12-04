@@ -37,6 +37,7 @@ model User {
   sharedDataAsDoctor  SharedHealthData[] @relation("DoctorSharedData")
   sentMessages     Message[] @relation("SentMessages")
   receivedMessages Message[] @relation("ReceivedMessages")
+  reminders Reminder[]
 }
 
 model Appointment {
@@ -167,5 +168,19 @@ model Message {
   isRead     Boolean  @default(false)
   fileUrl    String?
   fileType   String?
+}
+
+model Reminder {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  type        String   // 'medication', 'appointment', 'exam'
+  title       String
+  description String?
+  datetime    DateTime
+  isCompleted Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdBy   String   // ID of the doctor who created the reminder
 }
 

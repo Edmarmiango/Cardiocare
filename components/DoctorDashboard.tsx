@@ -1,5 +1,7 @@
+'use client'
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card"
 import Link from "next/link"
+import { ReminderManager } from './ReminderManager'
 
 export default function DoctorDashboard() {
   return (
@@ -51,7 +53,11 @@ export default function DoctorDashboard() {
           </CardContent>
         </Card>
       </div>
+      <div className="mt-8">
+        <ReminderManager />
+      </div>
     </div>
   )
 }
+
 

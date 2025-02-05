@@ -10,6 +10,7 @@ import { RadioGroup, RadioGroupItem } from "../../components/ui/radio-group"
 import { Alert, AlertTitle, AlertDescription } from "../../components/ui/alert"
 import { Upload } from 'lucide-react'
 import { useToast } from "../../components/ui/use-toast"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select"
 
 export default function RegisterPage() {
  const [name, setName] = useState('')
@@ -20,6 +21,9 @@ export default function RegisterPage() {
  const [specialty, setSpecialty] = useState('')
  const [profileImage, setProfileImage] = useState<File | null>(null)
  const [bi, setBi] = useState('')
+ const [dateOfBirth, setDateOfBirth] = useState('')
+ const [gender, setGender] = useState('')
+ const [address, setAddress] = useState('')
  const [isLoading, setIsLoading] = useState(false)
  const [feedback, setFeedback] = useState<{ type: 'success' | 'error', message: string } | null>(null)
  const [successMessage, setSuccessMessage] = useState<string | null>(null)
@@ -45,15 +49,18 @@ export default function RegisterPage() {
      formData.append('password', password)
      formData.append('userType', userType)
      formData.append('bi', bi)
+     formData.append('dateOfBirth', dateOfBirth)
+     formData.append('gender', gender)
+     formData.append('address', address)
      
      if (userType === 'DOCTOR') {
        formData.append('crm', crm)
        formData.append('specialty', specialty)
-       if (profileImage) {
-         formData.append('profileImage', profileImage)
-       }
      }
-
+     if (profileImage) {
+        formData.append('profileImage', profileImage)
+     }
+    
      const response = await fetch('/api/register', {
        method: 'POST',
        body: formData,
@@ -96,11 +103,11 @@ export default function RegisterPage() {
          <CardContent>
            <form onSubmit={handleSubmit} className="space-y-4">
            {successMessage && (
-  <Alert className="mb-4">
-    <AlertTitle>Sucesso</AlertTitle>
-    <AlertDescription>{successMessage}</AlertDescription>
-  </Alert>
-)}
+              <Alert className="mb-4">
+                <AlertTitle>Sucesso</AlertTitle>
+                <AlertDescription>{successMessage}</AlertDescription>
+              </Alert>
+            )}
              <div className="space-y-2">
                <Label htmlFor="name">Nome</Label>
                <Input
@@ -132,6 +139,37 @@ export default function RegisterPage() {
                />
              </div>
              <div className="space-y-2">
+               <Label htmlFor="dateOfBirth">Data de Nascimento</Label>
+               <Input
+                 id="dateOfBirth"
+                 type="date"
+                 value={dateOfBirth}
+                 onChange={(e) => setDateOfBirth(e.target.value)}
+                 required
+               />
+             </div>
+             <div>
+              <Label htmlFor="gender">Gênero</Label>
+              <Select onValueChange={setGender} required>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o gênero" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="MALE">Masculino</SelectItem>
+                  <SelectItem value="FEMALE">Feminino</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="address">Endereço</Label>
+              <Input 
+                id="address" 
+                value={address} 
+                onChange={(e) => setAddress(e.target.value)} 
+                required 
+              />
+            </div>
+             <div className="space-y-2">
                <Label>Tipo de Usuário</Label>
                <RadioGroup value={userType} onValueChange={setUserType}>
                  <div className="flex items-center space-x-2">
@@ -147,7 +185,7 @@ export default function RegisterPage() {
              {userType === 'DOCTOR' && (
                <>
                  <div className="space-y-2">
-                   <Label htmlFor="crm">CRM</Label>
+                   <Label htmlFor="crm">Número na Ordem dos Médicos </Label>
                    <Input
                      id="crm"
                      type="text"
@@ -166,9 +204,13 @@ export default function RegisterPage() {
                      required
                    />
                  </div>
-                 <div className="space-y-2">
-                   <Label htmlFor="profileImage">Foto de Perfil</Label>
-                   <div className="flex items-center gap-4">
+                
+               </>
+             )}
+
+             <div className="space-y-2">
+                <Label htmlFor="profileImage">Foto de Perfil</Label>
+                <div className="flex items-center gap-4">
                      <Input
                        id="profileImage"
                        type="file"
@@ -185,15 +227,13 @@ export default function RegisterPage() {
                        <Upload className="mr-2 h-4 w-4" />
                        {profileImage ? 'Trocar Imagem' : 'Carregar Imagem'}
                      </Button>
-                   </div>
+                  </div>
                    {profileImage && (
                      <p className="text-sm text-muted-foreground mt-1">
                        Arquivo selecionado: {profileImage.name}
                      </p>
                    )}
-                 </div>
-               </>
-             )}
+             </div>
              <div className="space-y-2">
                <Label htmlFor="bi">BI (Bilhete de Identidade)</Label>
                <Input

@@ -3,6 +3,8 @@ import { getServerSession } from "next-auth/next"
 import { authOptions } from '../../app/api/auth/[...nextauth]/auth-options';
 import prisma from '../../lib/prisma';
 import { createGoogleMeetLink } from "../../lib/googleMeet"
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -31,12 +33,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(404).json({ error: 'Appointment not found' });
     }
 
+     // Format date in Portuguese
+    const formattedDate = format(appointment.date, 'dd/MM/yyyy', { locale: ptBR });
+
     const meetLink = await createGoogleMeetLink(
       appointmentId,
       appointment.doctor.name,
       appointment.user.name,
-      appointment.date,
-      new Date(appointment.date.getTime() + 30 * 60000) // Assuming 30 minutes duration
+      formattedDate,
+      appointment.startTime,
+      appointment.endTime
     );
 
     if (!meetLink) {

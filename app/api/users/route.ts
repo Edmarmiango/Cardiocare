@@ -21,7 +21,7 @@ export async function GET() {
         role: true,
         status: true,
         crm: true,
-        imageUrl: true,
+        profileImage: true,
       },
       orderBy: {
         createdAt: 'desc',

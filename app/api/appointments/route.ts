@@ -3,7 +3,8 @@ import { getServerSession } from "next-auth/next"
 import { authOptions } from '../auth/[...nextauth]/auth-options'
 import prisma from '../../../lib/prisma'
 import { Role } from '@prisma/client'
-import { createGoogleMeetLink } from '../../../lib/googleMeet';
+import { createGoogleMeetLink } from '../../../lib/googleMeet'
+import { format } from 'date-fns'
 
 export async function GET(request: Request) {
   const session = await getServerSession(authOptions)
@@ -69,13 +70,16 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const session = await getServerSession(authOptions)
-
-  if (!session || !session.user) {
-    return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
-  }
-
   try {
+    const session = await getServerSession(authOptions)
+
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { error: 'Not authenticated' },
+        { status: 401 }
+      )
+    }
+
     const body = await request.json()
     const { doctorId, timeSlotId } = body
 
@@ -84,6 +88,9 @@ export async function POST(request: Request) {
       where: {
         id: timeSlotId,
         isBooked: false,
+      },
+      include: {
+        doctor: true,
       },
     })
 
@@ -94,83 +101,73 @@ export async function POST(request: Request) {
       )
     }
 
-    // Create the appointment and update the time slot in a transaction
-    const [appointment] = await prisma.$transaction([
-      prisma.appointment.create({
-        data: {
-          userId: session.user.id,
-          doctorId,
-          date: timeSlot.date,
-          status: 'SCHEDULED',
-        },
-      }),
-      prisma.timeSlot.update({
-        where: { id: timeSlotId },
-        data: { isBooked: true },
-      }),
-    ])
-
-    return NextResponse.json(appointment)
-  } catch (error) {
-    console.error('Error creating appointment:', error)
-    return NextResponse.json(
-      { error: 'Failed to create appointment' },
-      { status: 500 }
-    )
-  }
-}
-
-export async function PATCH(request: Request) {
-  const session = await getServerSession(authOptions)
-
-  if (!session || !session.user) {
-    return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
-  }
-
-  try {
-    const body = await request.json()
-    const { appointmentId, status, cancelReason } = body
-
-    const appointment = await prisma.appointment.findUnique({
-      where: { id: appointmentId },
+    // Get user data
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
     })
 
-    if (!appointment) {
+    if (!user) {
       return NextResponse.json(
-        { error: 'Appointment not found' },
+        { error: 'User not found' },
         { status: 404 }
       )
     }
 
-    // Verify user has permission to update this appointment
-    if (
-      session.user.role === Role.PATIENT && appointment.userId !== session.user.id ||
-      session.user.role === Role.DOCTOR && appointment.doctorId !== session.user.id
-    ) {
+    console.log('Creating appointment with data:', {
+      userId: session.user.id,
+      doctorId,
+      date: timeSlot.date,
+      startTime: timeSlot.startTime,
+      endTime: timeSlot.endTime
+    });
+
+    try {
+      // Format the date as 'dd/MM/yyyy' for createGoogleMeetLink
+      const formattedDate = format(timeSlot.date, 'dd/MM/yyyy');
+
+      // Create Google Meet link
+      const meetLink = await createGoogleMeetLink(
+        `temp_${Date.now()}`, // Temporary ID until we have the actual appointment
+        timeSlot.doctor.name,
+        user.name || 'Patient',
+        formattedDate,
+        timeSlot.startTime,
+        timeSlot.endTime
+      )
+
+      // Create the appointment with the meet link
+      const [appointment] = await prisma.$transaction([
+        prisma.appointment.create({
+          data: {
+            userId: session.user.id,
+            doctorId,
+            date: timeSlot.date,
+            startTime: timeSlot.startTime,
+            endTime: timeSlot.endTime,
+            status: 'SCHEDULED',
+            meetLink,
+          },
+        }),
+        prisma.timeSlot.update({
+          where: { id: timeSlotId },
+          data: { isBooked: true },
+        }),
+      ])
+
+      console.log('Successfully created appointment:', appointment);
+      return NextResponse.json(appointment)
+    } catch (error) {
+      console.error('Error in appointment creation:', error)
       return NextResponse.json(
-        { error: 'Not authorized' },
-        { status: 403 }
+        { error: 'Failed to create Google Meet link' },
+        { status: 500 }
       )
     }
-
-    const updatedAppointment = await prisma.appointment.update({
-      where: { id: appointmentId },
-      data: {
-        status,
-        cancelReason: status === 'CANCELLED' ? cancelReason : null,
-      },
-    })
-
-    return NextResponse.json(updatedAppointment)
   } catch (error) {
-    console.error('Error updating appointment:', error)
+    console.error('Error in appointment route:', error)
     return NextResponse.json(
-      { error: 'Failed to update appointment' },
+      { error: 'Internal server error' },
       { status: 500 }
     )
   }
 }
-
-
-
-

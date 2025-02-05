@@ -15,21 +15,25 @@ model User {
   name          String?
   email         String?   @unique
   emailVerified DateTime?
-  image         String?
   password      String?
   role          Role      @default(PATIENT)
   crm           String?
   status        UserStatus @default(APPROVED)
   specialty     String?
-  imageUrl      String?
+  profileImage  String?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   bi            String?
+  dateOfBirth   DateTime
+  gender        Gender
+  address       String
+  phoneNumber   String?
   appointments       Appointment[]
   doctorAppointments Appointment[] @relation("DoctorAppointments")
   schedules DoctorSchedule[]
-  prescriptions      Prescription[]
+  prescriptions      Prescription[] @relation("UserPrescriptions")
   healthData         HealthData[]
+  predictions Prediction[]
   notifications      Notification[]
   prescriptionsGiven Prescription[] @relation("DoctorPrescriptions")
   timeSlots TimeSlot[]
@@ -38,6 +42,11 @@ model User {
   sentMessages     Message[] @relation("SentMessages")
   receivedMessages Message[] @relation("ReceivedMessages")
   reminders Reminder[]
+  googleFitAccessToken  String?
+  googleFitRefreshToken String?
+  googleFitTokenExpiry  DateTime?
+  sharedWithDoctors SharedHealthData[] @relation("UserSharedData")
+  sharedFromPatients SharedHealthData[] @relation("DoctorSharedData")
 }
 
 model Appointment {
@@ -47,6 +56,8 @@ model Appointment {
   doctorId  String
   doctor    User     @relation("DoctorAppointments", fields: [doctorId], references: [id])
   date      DateTime
+  startTime    String   // Add this field
+  endTime      String   // Add this field
   meetLink  String?
   status    AppointmentStatus @default(SCHEDULED)
   createdAt DateTime @default(now())
@@ -62,26 +73,31 @@ model Prescription {
   instructions String
   startDate    DateTime
   endDate      DateTime?
+  status       String   @default("ACTIVE") // ACTIVE, COMPLETED, ARCHIVED
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
-  user         User     @relation(fields: [userId], references: [id])
+  user         User     @relation("UserPrescriptions", fields: [userId], references: [id])
   userId       String
   doctor       User     @relation("DoctorPrescriptions", fields: [doctorId], references: [id])
   doctorId     String
+
+  @@index([userId])
+  @@index([doctorId])
 }
 
 model HealthData {
-  id            String   @id @default(cuid())
-  userId        String
-  user          User     @relation(fields: [userId], references: [id])
-  systolic   Int
-  diastolic  Int
-  heartRate  Int
-  glucose    Int
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  date      DateTime
+  age_years Int?
+  systolic  Int
+  diastolic Int
+  heartRate Int
+  glucose   Int
   cholesterol Int
-  date          DateTime
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model SharedHealthData {
@@ -92,6 +108,15 @@ model SharedHealthData {
   doctor     User     @relation("DoctorSharedData", fields: [doctorId], references: [id])
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
+}
+
+model Prediction {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  probability Float
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Notification {
@@ -155,6 +180,11 @@ enum AppointmentStatus {
   SCHEDULED
   COMPLETED
   CANCELLED
+}
+
+enum Gender {
+  MALE
+  FEMALE
 }
 
 model Message {

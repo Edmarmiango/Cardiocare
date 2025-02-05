@@ -1,9 +1,10 @@
-'use client'
+"use client"
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "../../components/ui/dialog"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select"
 import { Textarea } from "../../components/ui/textarea"
-import { format, parseISO, addMinutes } from 'date-fns'
+import { format, parseISO } from "date-fns"
 import { Button } from "../../components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card"
 import { toast } from "../../components/ui/use-toast"
@@ -11,29 +12,33 @@ import { fetchAppointments } from "../../services/appointments"
 import { AppointmentStatus, Role } from "../types"
 import { useSession } from "next-auth/react"
 import { GoogleMeetIntegration } from "../../components/GoogleMeetIntegration"
-import { DoctorScheduleManager } from '../../components/DoctorScheduleManager'
-import { AppointmentBooking } from '../../components/AppointmentBooking'
+import { DoctorScheduleManager } from "../../components/DoctorScheduleManager"
+import { AppointmentBooking } from "../../components/AppointmentBooking"
+import { ptBR } from "date-fns/locale"
 
 interface Appointment {
-  id: string;
-  date: string;
-  meetLink: string | null;
-  status: AppointmentStatus;
+  id: string
+  date: string
+  timeSlot: string
+  meetLink: string | null
+  status: AppointmentStatus
   doctor: {
-    name: string;
-  };
+    name: string
+  }
   user: {
-    name: string;
-  };
-  cancelReason?: string;
+    name: string
+  }
+  cancelReason?: string
+  startTime: string
+  endTime: string
 }
 
 const updateAppointmentStatus = async (appointmentId: string, status: AppointmentStatus, cancelReason?: string) => {
   try {
-    const response = await fetch('/api/appointments', {
-      method: 'PATCH',
+    const response = await fetch("/api/appointments", {
+      method: "PATCH",
       headers: {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
       },
       body: JSON.stringify({ appointmentId, status, cancelReason }),
     })
@@ -45,10 +50,10 @@ const updateAppointmentStatus = async (appointmentId: string, status: Appointmen
       })
       return true
     } else {
-      throw new Error('Failed to update appointment status')
+      throw new Error("Failed to update appointment status")
     }
   } catch (error) {
-    console.error('Error updating appointment status:', error)
+    console.error("Error updating appointment status:", error)
     toast({
       title: "Error",
       description: "Failed to update appointment status",
@@ -61,13 +66,15 @@ const updateAppointmentStatus = async (appointmentId: string, status: Appointmen
 export default function TelemedicinePage() {
   const { data: session } = useSession()
   const [appointments, setAppointments] = useState<Appointment[]>([])
+  const [selectedStatus, setSelectedStatus] = useState<string>("ALL")
+  const [cancelReason, setCancelReason] = useState("")
 
   const fetchAppointmentsData = useCallback(async () => {
     try {
       const appointmentsData = await fetchAppointments()
       setAppointments(appointmentsData)
     } catch (error) {
-      console.error('Error fetching appointments:', error)
+      console.error("Error fetching appointments:", error)
       toast({
         title: "Error",
         description: "Failed to fetch appointments",
@@ -81,39 +88,49 @@ export default function TelemedicinePage() {
   }, [fetchAppointmentsData])
 
   const joinMeeting = (meetLink: string) => {
-    window.open(meetLink, '_blank')
+    window.open(meetLink, "_blank")
   }
 
-  const [cancelReason, setCancelReason] = useState('')
+  const handleComplete = useCallback(
+    async (appointmentId: string) => {
+      const success = await updateAppointmentStatus(appointmentId, AppointmentStatus.COMPLETED)
+      if (success) {
+        fetchAppointmentsData()
+      }
+    },
+    [fetchAppointmentsData],
+  )
 
-  const handleComplete = useCallback(async (appointmentId: string) => {
-    const success = await updateAppointmentStatus(appointmentId, AppointmentStatus.COMPLETED)
-    if (success) {
-      fetchAppointmentsData()
-    }
-  }, [fetchAppointmentsData])
+  const handleCancel = useCallback(
+    async (appointmentId: string) => {
+      const success = await updateAppointmentStatus(appointmentId, AppointmentStatus.CANCELLED, cancelReason)
+      if (success) {
+        fetchAppointmentsData()
+        setCancelReason("")
+      }
+    },
+    [fetchAppointmentsData, cancelReason],
+  )
 
-  const handleCancel = useCallback(async (appointmentId: string) => {
-    const success = await updateAppointmentStatus(appointmentId, AppointmentStatus.CANCELLED, cancelReason)
-    if (success) {
-      fetchAppointmentsData()
-      setCancelReason('')
+  const translateStatus = (status: string): string => {
+    const statusMap: { [key: string]: string } = {
+      SCHEDULED: "Agendado",
+      COMPLETED: "Concluído",
+      CANCELLED: "Cancelado",
+      ALL: "Todos",
     }
-  }, [fetchAppointmentsData, cancelReason])
 
-  const formatAppointmentDate = (dateString: string) => {
-    try {
-      const date = parseISO(dateString)
-      return format(date, 'PPpp') // e.g. "Apr 29, 2023, 9:30 AM"
-    } catch (error) {
-      console.error('Error formatting date:', error)
-      return dateString
-    }
+    return statusMap[status] || status
   }
+
+  const filteredAppointments = appointments.filter((appointment) => {
+    if (selectedStatus === "ALL") return true
+    return appointment.status === selectedStatus
+  })
 
   return (
     <div className="container mx-auto p-4">
-      <h1 className="text-2xl font-bold mb-4">Telemedicine</h1>
+      <h1 className="text-2xl font-bold mb-4">Telemedicina</h1>
 
       {session?.user?.role === Role.PATIENT && (
         <div className="mb-8">
@@ -127,69 +144,91 @@ export default function TelemedicinePage() {
         </div>
       )}
 
-      <h2 className="text-xl font-semibold mb-4">Your Appointments</h2>
-      {appointments.length > 0 ? (
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-xl font-semibold">Seus compromissos</h2>
+        <div className="w-[200px]">
+          <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+            <SelectTrigger>
+              <SelectValue placeholder="Filtrar por status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">Todos</SelectItem>
+              <SelectItem value="SCHEDULED">Agendado</SelectItem>
+              <SelectItem value="COMPLETED">Concluído</SelectItem>
+              <SelectItem value="CANCELLED">Cancelado</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      {filteredAppointments.length > 0 ? (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {appointments.map((appointment) => (
+          {filteredAppointments.map((appointment) => (
             <Card key={appointment.id}>
               <CardHeader>
-                <CardTitle>{session?.user?.role === Role.PATIENT ? `Dr. ${appointment.doctor.name}` : appointment.user.name}</CardTitle>
+                <CardTitle>
+                  {session?.user?.role === Role.PATIENT ? `Dr. ${appointment.doctor.name}` : appointment.user.name}
+                </CardTitle>
               </CardHeader>
               <CardContent>
                 <p>
-                  <strong>Date:</strong> {format(parseISO(appointment.date), 'PPP')}
+                  <strong>Data:</strong> {format(parseISO(appointment.date), "d 'de' MMMM 'de' yyyy", { locale: ptBR })}
                   <br />
-                  <strong>Time:</strong> {format(parseISO(appointment.date), 'HH:mm')} - {format(addMinutes(parseISO(appointment.date), 30), 'HH:mm')}
+                  <strong>Hora:</strong> {appointment.startTime} - {appointment.endTime}
                 </p>
-                <p><strong>Status:</strong> {appointment.status}</p>
+                <p>
+                  <strong>Status:</strong> {translateStatus(appointment.status)}
+                </p>
                 {appointment.status === AppointmentStatus.SCHEDULED && (
                   <>
                     {appointment.meetLink ? (
                       <Button onClick={() => joinMeeting(appointment.meetLink!)} className="mt-2 mr-2">
-                        Join Meeting
+                        Participar da reunião
                       </Button>
                     ) : (
                       <GoogleMeetIntegration appointmentId={appointment.id} />
                     )}
                     {session?.user?.role === Role.DOCTOR && (
                       <Button onClick={() => handleComplete(appointment.id)} className="mt-2 mr-2">
-                        Mark as Completed
+                        Marcar como concluído
                       </Button>
                     )}
                     <Dialog>
                       <DialogTrigger asChild>
-                        <Button variant="destructive" className="mt-2">Cancel</Button>
+                        <Button variant="destructive" className="mt-2">
+                          Cancelar
+                        </Button>
                       </DialogTrigger>
                       <DialogContent>
                         <DialogHeader>
-                          <DialogTitle>Cancel Appointment</DialogTitle>
+                          <DialogTitle>Cancelar compromisso</DialogTitle>
                         </DialogHeader>
                         <Textarea
-                          placeholder="Reason for cancellation"
+                          placeholder="Motivo do cancelamento"
                           value={cancelReason}
                           onChange={(e) => setCancelReason(e.target.value)}
                         />
                         <Button onClick={() => handleCancel(appointment.id)} variant="destructive">
-                          Confirm Cancellation
+                          Confirmar cancelamento
                         </Button>
                       </DialogContent>
                     </Dialog>
                   </>
                 )}
                 {appointment.status === AppointmentStatus.CANCELLED && appointment.cancelReason && (
-                  <p><strong>Cancellation Reason:</strong> {appointment.cancelReason}</p>
+                  <p>
+                    <strong>Motivo do cancelamento:</strong> {appointment.cancelReason}
+                  </p>
                 )}
               </CardContent>
             </Card>
           ))}
         </div>
       ) : (
-        <p>No appointments found.</p>
+        <p>Nenhum compromisso encontrado.</p>
       )}
     </div>
   )
 }
-
-
 
 

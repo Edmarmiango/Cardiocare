@@ -113,7 +113,7 @@ export function ShareHealthData() {
           <h3 className="text-lg font-semibold mb-2">Médicos com acesso aos seus dados:</h3>
           <ul className="list-disc pl-5">
             {sharedDoctors.map((email) => (
-              <li key={`doctor-${email}`}>{email}</li>
+              <p key={`doctor-${email}`}>{email}</p>
             ))}
           </ul>
         </div>
@@ -121,14 +121,6 @@ export function ShareHealthData() {
     </form>
   )
 }
-
-
-
-
-
-
-
-
 
 
 

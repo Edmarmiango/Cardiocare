@@ -82,3 +82,47 @@ export async function POST(request: Request) {
   }
 }
 
+
+export async function DELETE(request: Request) {
+  try {
+    const session = await getServerSession(authOptions)
+
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Não autorizado" }, { status: 401 })
+    }
+
+    const { doctorEmail } = await request.json()
+
+    if (!doctorEmail) {
+      return NextResponse.json({ error: "Email do médico é obrigatório" }, { status: 400 })
+    }
+
+    // Find the doctor by email
+    const doctor = await prisma.user.findUnique({
+      where: { email: doctorEmail },
+    })
+
+    if (!doctor) {
+      return NextResponse.json({ error: "Médico não encontrado" }, { status: 404 })
+    }
+
+    // Remove the sharing relationship
+    await prisma.sharedHealthData.delete({
+      where: {
+        userId_doctorId: {
+          userId: session.user.id,
+          doctorId: doctor.id,
+        },
+      },
+    })
+
+    return NextResponse.json({
+      message: "Acesso removido com sucesso",
+    })
+  } catch (error) {
+    console.error("Erro ao remover acesso:", error)
+    return NextResponse.json({ error: "Erro ao remover acesso" }, { status: 500 })
+  }
+}
+
+

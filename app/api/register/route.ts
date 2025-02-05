@@ -13,11 +13,15 @@ export async function POST(request: Request) {
     const name = formData.get('name') as string
     const email = formData.get('email') as string
     const password = formData.get('password') as string
+    const dateOfBirth = formData.get('dateOfBirth') as string
+    const address = formData.get('address') as string
+    const gender = formData.get('gender') as string
     const userType = formData.get('userType') as string
     const bi = formData.get('bi') as string
     const crm = formData.get('crm') as string
     const specialty = formData.get('specialty') as string
     const profileImage = formData.get('profileImage') as File | null
+   
 
     // Verifique se o usuário já existe
     const existingUser = await prisma.user.findUnique({
@@ -53,9 +57,12 @@ export async function POST(request: Request) {
         role: userType.toUpperCase(),
         crm: userType === 'DOCTOR' ? crm : null,
         specialty: userType === 'DOCTOR' ? specialty : null,
-        imageUrl,
+        profileImage: imageUrl,
         status: userType === 'DOCTOR' ? 'PENDING' : 'APPROVED',
         bi,
+        dateOfBirth: new Date(dateOfBirth),
+        address,
+        gender
       },
     })
 

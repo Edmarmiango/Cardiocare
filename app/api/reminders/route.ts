@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from "next-auth/next"
 import { authOptions } from '../auth/[...nextauth]/auth-options'
 import prisma from '../../../lib/prisma'
+import { getRemindersForUser } from "../../../lib/reminderService"
 
 export async function GET(request: Request) {
   const session = await getServerSession(authOptions)

@@ -9,6 +9,9 @@ import { Label } from "../../components/ui/label"
 import { Textarea } from "../../components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select"
 import { toast } from "../../components/ui/use-toast"
+import { createReminderAction } from '../../app/actions/reminders'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/tabs"
+import { Alert, AlertDescription, AlertTitle } from "../../components/ui/alert"
 
 interface Prescription {
   id: string;
@@ -18,12 +21,15 @@ interface Prescription {
   instructions: string;
   startDate: string;
   endDate: string | null;
-  doctor?: {
+  status: 'ACTIVE' | 'COMPLETED' | 'ARCHIVED';
+  userId: string;
+  doctorId: string;
+  user: {
+    name: string;
+  };
+  doctor: {
     name: string;
     specialty: string;
-  };
-  user?: {
-    name: string;
   };
 }
 
@@ -46,36 +52,39 @@ export default function PrescriptionsPage() {
     endDate: ''
   })
   const [isLoading, setIsLoading] = useState(true)
+  const [activeTab, setActiveTab] = useState('ACTIVE')
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     if (status === 'authenticated') {
-      fetchPrescriptions()
-      if (session.user.role === 'DOCTOR') {
+      fetchPrescriptions(activeTab)
+      if (session?.user.role === 'DOCTOR') {
         fetchPatients()
       }
     }
-  }, [status, session])
+  }, [status, session, activeTab])
 
-  const fetchPrescriptions = async () => {
+  const fetchPrescriptions = async (status: string) => {
+    setError(null)
     try {
-      const response = await fetch('/api/prescriptions')
+      const response = await fetch(`/api/prescriptions?status=${status}`)
       if (response.ok) {
         const data = await response.json()
         setPrescriptions(data)
       } else {
-        toast({
-          title: "Error",
-          description: "Falha ao buscar receitas",
-          variant: "destructive",
-        })
+        const errorData = await response.json()
+        const errorMessage = errorData.error || 'Failed to fetch prescriptions'
+        throw new Error(errorMessage)
       }
     } catch (error) {
-      console.error('Erro ao buscar prescrições:', error)
+      console.error('Error fetching prescriptions:', error)
+      const errorMessage = error instanceof Error ? error.message : 'Failed to fetch prescriptions'
       toast({
         title: "Error",
-        description: "Ocorreu um erro inesperado",
+        description: errorMessage,
         variant: "destructive",
       })
+      setError(errorMessage)
     } finally {
       setIsLoading(false)
     }
@@ -88,17 +97,13 @@ export default function PrescriptionsPage() {
         const data = await response.json()
         setPatients(data)
       } else {
-        toast({
-          title: "Error",
-          description: "Falha ao buscar pacientes",
-          variant: "destructive",
-        })
+        throw new Error('Failed to fetch patients')
       }
     } catch (error) {
-      console.error('Erro ao buscar pacientes:', error)
+      console.error('Error fetching patients:', error)
       toast({
         title: "Error",
-        description: "Ocorreu um erro inesperado",
+        description: "Failed to fetch patients",
         variant: "destructive",
       })
     }
@@ -106,55 +111,197 @@ export default function PrescriptionsPage() {
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault()
-    if (session?.user.role !== 'DOCTOR') {
+  
+    if (session?.user.role !== "DOCTOR") {
       toast({
         title: "Error",
-        description: "Somente médicos podem criar prescrições",
+        description: "Only doctors can create prescriptions",
         variant: "destructive",
       })
       return
     }
+  
+    // Validate form data
+    if (
+      !newPrescription.patientId ||
+      !newPrescription.medication ||
+      !newPrescription.dosage ||
+      !newPrescription.frequency ||
+      !newPrescription.instructions ||
+      !newPrescription.startDate
+    ) {
+      toast({
+        title: "Error",
+        description: "Please fill in all required fields",
+        variant: "destructive",
+      })
+      return
+    }
+  
+    try {
+      // Log the request payload for debugging
+      console.log("Sending prescription data:", newPrescription)
+  
+      const response = await fetch("/api/prescriptions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(newPrescription),
+      })
+  
+      // Log the response status and headers for debugging
+      console.log("Response status:", response.status)
+      console.log("Response headers:", Object.fromEntries(response.headers.entries()))
+  
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || "Failed to create prescription")
+      }
+  
+      const prescriptionData = await response.json()
+  
+      // Create reminders for the medication
+      try {
+        const startDate = new Date(prescriptionData.startDate)
+        const endDate = prescriptionData.endDate ? new Date(prescriptionData.endDate) : null
+        const [frequency, period] = prescriptionData.frequency.split(" ")
+  
+        const currentDate = new Date(startDate)
+        while (!endDate || currentDate <= endDate) {
+          const reminderResult = await createReminderAction({
+            userId: prescriptionData.userId,
+            type: "medication",
+            title: `Take ${prescriptionData.medication}`,
+            description: `Dosage: ${prescriptionData.dosage}. ${prescriptionData.instructions}`,
+            datetime: new Date(currentDate),
+          })
+  
+          if (!reminderResult.success) {
+            throw new Error("Failed to create reminders")
+          }
+  
+          // Move to the next occurrence based on frequency
+          if (period === "daily") {
+            currentDate.setDate(currentDate.getDate() + 1)
+          } else if (period === "weekly") {
+            currentDate.setDate(currentDate.getDate() + 7)
+          } else if (period === "monthly") {
+            currentDate.setMonth(currentDate.getMonth() + 1)
+          }
+        }
+  
+        toast({
+          title: "Success",
+          description: "Prescription created successfully. Reminders have been set.",
+        })
+  
+        // Reset form and refresh data
+        fetchPrescriptions(activeTab)
+        setNewPrescription({
+          patientId: "",
+          medication: "",
+          dosage: "",
+          frequency: "",
+          instructions: "",
+          startDate: "",
+          endDate: "",
+        })
+      } catch (reminderError) {
+        console.error("Error creating reminders:", reminderError)
+        toast({
+          title: "Warning",
+          description: "Prescription created but failed to set reminders",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error("Error creating prescription:", error)
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "An unexpected error occurred",
+        variant: "destructive",
+      })
+    }
+  }
 
+  const handleStatusChange = async (prescriptionId: string, newStatus: 'ACTIVE' | 'COMPLETED' | 'ARCHIVED') => {
     try {
       const response = await fetch('/api/prescriptions', {
-        method: 'POST',
+        method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(newPrescription),
+        body: JSON.stringify({ id: prescriptionId, status: newStatus }),
       })
 
       if (response.ok) {
         toast({
           title: "Success",
-          description: "Prescrição criada com sucesso",
+          description: "Prescription status updated successfully.",
         })
-        fetchPrescriptions()
-        setNewPrescription({
-          patientId: '',
-          medication: '',
-          dosage: '',
-          frequency: '',
-          instructions: '',
-          startDate: '',
-          endDate: ''
-        })
+        fetchPrescriptions(activeTab)
       } else {
-        toast({
-          title: "Error",
-          description: "Falha ao criar prescrição",
-          variant: "destructive",
-        })
+        throw new Error('Failed to update prescription status')
       }
     } catch (error) {
-      console.error('Erro ao criar prescrição:', error)
+      console.error('Error updating prescription status:', error)
       toast({
         title: "Error",
-        description: "Ocorreu um erro inesperado",
+        description: "Failed to update prescription status",
         variant: "destructive",
       })
     }
   }
+
+  const renderPrescriptions = (status: 'ACTIVE' | 'COMPLETED' | 'ARCHIVED') => {
+    const filteredPrescriptions = prescriptions.filter(p => p.status === status);
+    return filteredPrescriptions.length > 0 ? (
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        {filteredPrescriptions.map((prescription) => (
+          <Card key={prescription.id}>
+            <CardHeader>
+              <CardTitle>{prescription.medication}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p><strong>Dosagem:</strong> {prescription.dosage}</p>
+              <p><strong>Frequência:</strong> {prescription.frequency}</p>
+              <p><strong>Instruções:</strong> {prescription.instructions}</p>
+              <p><strong>Data de início:</strong> {new Date(prescription.startDate).toLocaleDateString()}</p>
+              {prescription.endDate && (
+                <p><strong>Data de término:</strong> {new Date(prescription.endDate).toLocaleDateString()}</p>
+              )}
+              {session?.user.role === 'PATIENT' && prescription.doctor && (
+                <p><strong>Prescrito por:</strong> Dr(a). {prescription.doctor.name} ({prescription.doctor.specialty})</p>
+              )}
+              {session?.user.role === 'DOCTOR' && prescription.user && (
+                <p><strong>Paciente:</strong> {prescription.user.name}</p>
+              )}
+              {session?.user.role === 'DOCTOR' && (
+                <div className="mt-4">
+                  <Select
+                    value={prescription.status}
+                    onValueChange={(value) => handleStatusChange(prescription.id, value as 'ACTIVE' | 'COMPLETED' | 'ARCHIVED')}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Change status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ACTIVE">Activo</SelectItem>
+                      <SelectItem value="COMPLETED">Concluído</SelectItem>
+                      <SelectItem value="ARCHIVED">Arquivado</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    ) : (
+      <p>Nenhuma prescrição {status.toLowerCase()} encontrada.</p>
+    );
+  };
 
   if (isLoading) {
     return <div>Loading...</div>
@@ -162,36 +309,30 @@ export default function PrescriptionsPage() {
 
   return (
     <div className="container mx-auto p-4">
-      <h1 className="text-2xl font-bold mb-4">Prescrições</h1>
-      
-      {prescriptions.length > 0 ? (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {prescriptions.map((prescription) => (
-            <Card key={prescription.id}>
-              <CardHeader>
-                <CardTitle>{prescription.medication}</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p><strong>Dosagem:</strong> {prescription.dosage}</p>
-                <p><strong>Frequência:</strong> {prescription.frequency}</p>
-                <p><strong>Instruções:</strong> {prescription.instructions}</p>
-                <p><strong>Data de início:</strong> {new Date(prescription.startDate).toLocaleDateString()}</p>
-                {prescription.endDate && (
-                  <p><strong>Data de término:</strong> {new Date(prescription.endDate).toLocaleDateString()}</p>
-                )}
-                {session?.user.role === 'PATIENT' && prescription.doctor && (
-                  <p><strong>Prescrito por:</strong> Dr. {prescription.doctor.name} ({prescription.doctor.specialty})</p>
-                )}
-                {session?.user.role === 'DOCTOR' && prescription.user && (
-                  <p><strong>Paciente:</strong> {prescription.user.name}</p>
-                )}
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      ) : (
-        <p>Nenhuma prescrição encontrada.</p>
+      {error && (
+        <Alert variant="destructive" className="mb-4">
+          <AlertTitle>Error</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
       )}
+      <h1 className="text-2xl font-bold mb-4">Prescrições</h1>
+
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-4">
+        <TabsList>
+          <TabsTrigger value="ACTIVE">Activo</TabsTrigger>
+          <TabsTrigger value="COMPLETED">Concluído</TabsTrigger>
+          <TabsTrigger value="ARCHIVED">Arquivado</TabsTrigger>
+        </TabsList>
+        <TabsContent value="ACTIVE">
+          {renderPrescriptions('ACTIVE')}
+        </TabsContent>
+        <TabsContent value="COMPLETED">
+          {renderPrescriptions('COMPLETED')}
+        </TabsContent>
+        <TabsContent value="ARCHIVED">
+          {renderPrescriptions('ARCHIVED')}
+        </TabsContent>
+      </Tabs>
 
       {session?.user.role === 'DOCTOR' && (
         <Card className="mt-8">
@@ -207,7 +348,7 @@ export default function PrescriptionsPage() {
                   onValueChange={(value) => setNewPrescription({...newPrescription, patientId: value})}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select a patient" />
+                    <SelectValue placeholder="Selecione o paciente" />
                   </SelectTrigger>
                   <SelectContent>
                     {patients.map((patient) => (
@@ -253,7 +394,7 @@ export default function PrescriptionsPage() {
                 />
               </div>
               <div>
-                <Label htmlFor="startDate">Start Date</Label>
+                <Label htmlFor="startDate">Data de início</Label>
                 <Input
                   id="startDate"
                   type="date"
@@ -263,7 +404,7 @@ export default function PrescriptionsPage() {
                 />
               </div>
               <div>
-                <Label htmlFor="endDate">Data de término (optional)</Label>
+                <Label htmlFor="endDate">Data de término (opcional)</Label>
                 <Input
                   id="endDate"
                   type="date"
@@ -279,4 +420,6 @@ export default function PrescriptionsPage() {
     </div>
   )
 }
+
+
 

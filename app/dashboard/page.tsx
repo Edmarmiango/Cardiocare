@@ -1,8 +1,6 @@
 import { redirect } from 'next/navigation'
 import { getServerSession } from "next-auth/next"
-import { authOptions } from "../api/auth/[...nextauth]/auth-options"
-import PatientDashboard from '../../components/PatientDashboard'
-import DoctorDashboard from '../../components/DoctorDashboard'
+import { authOptions } from '../api/auth/[...nextauth]/auth-options'
 
 export default async function DashboardPage() {
   const session = await getServerSession(authOptions)
@@ -11,13 +9,19 @@ export default async function DashboardPage() {
     redirect('/login')
   }
 
-  // Redirecionar admin para o dashboard administrativo
-  if (session.user.role === 'ADMIN') {
-    redirect('/admin/dashboard')
+  // Redirect based on user role
+  switch (session.user.role) {
+    case 'ADMIN':
+      redirect('/admin/dashboard')
+    case 'DOCTOR':
+      redirect('/doctor/dashboard')
+    case 'PATIENT':
+      redirect('/patient/dashboard')
+    default:
+      redirect('/')
   }
-
-  // Renderizar o dashboard apropriado com base na role do usuário
-  return session.user.role === 'DOCTOR' ? <DoctorDashboard /> : <PatientDashboard />
 }
+
+
 
 

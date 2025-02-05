@@ -25,9 +25,20 @@ export async function GET() {
           role: true,
           status: true,
           crm: true,
-          imageUrl: true,
+          profileImage: true,
+          specialty: true,
+          bi: true,
+          dateOfBirth: true,
+          gender: true,
+          address: true,
         },
       })
+
+      // Format the date of birth to ISO string for consistent serialization
+    const formattedUsers = users.map(user => ({
+      ...user,
+      dateOfBirth: user.dateOfBirth.toISOString(),
+    }))
 
     return NextResponse.json(users)
   } catch (error) {

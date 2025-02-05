@@ -1,9 +1,12 @@
 'use client'
+
 import { useState, useEffect } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card"
 import Link from "next/link"
 import { useSession } from "next-auth/react"
 import { toast } from "../components/ui/use-toast"
+import { ReminderList } from './ReminderList'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card"
+import { Button } from "../components/ui/button"
 
 interface Reminder {
   id: string
@@ -51,10 +54,10 @@ export default function PatientDashboard() {
             <CardTitle>Seu Resumo de Saúde</CardTitle>
           </CardHeader>
           <CardContent>
-            <p>Veja seus dados de saúde mais recentes e previsões aqui.</p>
-            <Link href="/monitoramento" className="text-blue-500 hover:underline">
-              Ver monitoramento
-            </Link>
+          <CardDescription>Veja seus dados de saúde mais recentes e previsões aqui.</CardDescription>
+            <Button asChild className="mt-4">
+              <Link href="/monitoring">Ver monitoramento</Link>
+            </Button>
           </CardContent>
         </Card>
         <Card>
@@ -62,10 +65,10 @@ export default function PatientDashboard() {
             <CardTitle>Próximas Consultas</CardTitle>
           </CardHeader>
           <CardContent>
-            <p>Você não tem consultas agendadas.</p>
-            <Link href="/agendar-consulta" className="text-blue-500 hover:underline">
-              Agendar consulta
-            </Link>
+          <CardDescription>Veja suas próximas consultas agendadas.</CardDescription>
+            <Button asChild className="mt-4">
+              <Link href="/telemedicine">Agendar consulta</Link>
+            </Button>
           </CardContent>
         </Card>
         <Card>
@@ -73,10 +76,10 @@ export default function PatientDashboard() {
             <CardTitle>Predição de Risco</CardTitle>
           </CardHeader>
           <CardContent>
-            <p>Faça uma avaliação do seu risco cardiovascular.</p>
-            <Link href="/predicao" className="text-blue-500 hover:underline">
-              Fazer predição
-            </Link>
+          <CardDescription>Faça uma avaliação do seu risco cardiovascular.</CardDescription>
+            <Button asChild className="mt-4">
+              <Link href="/prediction">Fazer predição</Link>
+            </Button>
           </CardContent>
         </Card>
         <Card>
@@ -84,36 +87,18 @@ export default function PatientDashboard() {
             <CardTitle>Suas Prescrições</CardTitle>
           </CardHeader>
           <CardContent>
-            <p>Veja suas prescrições médicas atuais.</p>
-            <Link href="/prescricoes" className="text-blue-500 hover:underline">
-              Ver prescrições
-            </Link>
+          <CardDescription>Veja suas prescrições médicas atuais.</CardDescription>
+            <Button asChild className="mt-4">
+              <Link href="/prescriptions">Ver prescrições</Link>
+            </Button>
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle>Seus Lembretes</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {reminders.length > 0 ? (
-              <ul className="space-y-2">
-                {reminders.map((reminder) => (
-                  <li key={reminder.id} className="flex justify-between items-center">
-                    <span>{reminder.title}</span>
-                    <span className="text-sm text-gray-500">
-                      {new Date(reminder.datetime).toLocaleString()}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p>Você não tem lembretes no momento.</p>
-            )}
-          </CardContent>
-        </Card>
+        <ReminderList />
       </div>
     </div>
   )
 }
+
+
 
 

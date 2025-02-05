@@ -86,15 +86,15 @@ export function ReminderManager() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Create Reminder</CardTitle>
+        <CardTitle>Criar lembrete</CardTitle>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <Label htmlFor="patient">Patient</Label>
+            <Label htmlFor="patient">Paciente</Label>
             <Select value={selectedPatient} onValueChange={setSelectedPatient}>
               <SelectTrigger>
-                <SelectValue placeholder="Select a patient" />
+                <SelectValue placeholder="Selecione o paciente" />
               </SelectTrigger>
               <SelectContent>
                 {patients.map((patient) => (
@@ -106,20 +106,20 @@ export function ReminderManager() {
             </Select>
           </div>
           <div>
-            <Label htmlFor="type">Reminder Type</Label>
+            <Label htmlFor="type">Tipo de lembrete</Label>
             <Select value={reminderType} onValueChange={setReminderType}>
               <SelectTrigger>
-                <SelectValue placeholder="Select reminder type" />
+                <SelectValue placeholder="Selecione o tipo de lembrete" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="medication">Medication</SelectItem>
-                <SelectItem value="appointment">Appointment</SelectItem>
-                <SelectItem value="exam">Exam</SelectItem>
+                <SelectItem value="medication">Medicamento</SelectItem>
+                <SelectItem value="appointment">Consulta Online</SelectItem>
+                <SelectItem value="exam">Exame</SelectItem>
               </SelectContent>
             </Select>
           </div>
           <div>
-            <Label htmlFor="title">Title</Label>
+            <Label htmlFor="title">Título</Label>
             <Input
               id="title"
               value={title}
@@ -128,7 +128,7 @@ export function ReminderManager() {
             />
           </div>
           <div>
-            <Label htmlFor="description">Description</Label>
+            <Label htmlFor="description">Descrição</Label>
             <Textarea
               id="description"
               value={description}
@@ -136,7 +136,7 @@ export function ReminderManager() {
             />
           </div>
           <div>
-            <Label htmlFor="datetime">Date and Time</Label>
+            <Label htmlFor="datetime">Data e hora</Label>
             <Input
               id="datetime"
               type="datetime-local"
@@ -145,7 +145,7 @@ export function ReminderManager() {
               required
             />
           </div>
-          <Button type="submit">Create Reminder</Button>
+          <Button type="submit">Criar Lembrete</Button>
         </form>
       </CardContent>
     </Card>

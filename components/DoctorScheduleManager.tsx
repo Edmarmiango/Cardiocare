@@ -87,12 +87,12 @@ export function DoctorScheduleManager() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Manage Your Schedule</CardTitle>
+        <CardTitle>Gerencie sua programação</CardTitle>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <Label htmlFor="date">Date</Label>
+            <Label htmlFor="date">Data</Label>
             <Input
               id="date"
               type="date"
@@ -104,7 +104,7 @@ export function DoctorScheduleManager() {
             />
           </div>
           <div>
-            <Label htmlFor="startTime">Start Time</Label>
+            <Label htmlFor="startTime">Hora de início</Label>
             <Input
               id="startTime"
               type="time"
@@ -114,7 +114,7 @@ export function DoctorScheduleManager() {
             />
           </div>
           <div>
-            <Label htmlFor="endTime">End Time</Label>
+            <Label htmlFor="endTime">Hora de término</Label>
             <Input
               id="endTime"
               type="time"
@@ -123,14 +123,14 @@ export function DoctorScheduleManager() {
               required
             />
           </div>
-          <Button type="submit">Add Time Slot</Button>
+          <Button type="submit">Adicionar intervalo de tempo (Duração)</Button>
         </form>
 
         <div className="mt-8">
-          <h3 className="text-lg font-semibold mb-4">Current Time Slots</h3>
+          <h3 className="text-lg font-semibold mb-4">Horários atuais</h3>
           {timeSlots.map((slot) => (
             <div key={slot.id} className="mb-2">
-              <p>{format(new Date(slot.date), 'dd/MM/yyyy')}: {slot.startTime} - {slot.endTime} {slot.isBooked ? '(Booked)' : '(Available)'}</p>
+              <p>{format(new Date(slot.date), 'dd/MM/yyyy')}: {slot.startTime} - {slot.endTime} {slot.isBooked ? '(Reservado)' : '(Disponível)'}</p>
             </div>
           ))}
         </div>

@@ -8,6 +8,20 @@ import { Button } from "../../../components/ui/button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../../components/ui/table"
 import Image from 'next/image'
 
+
+
+const translateGender = (gender: string): string => {
+  switch (gender) {
+    case 'MALE':
+      return 'Masculino';
+    case 'FEMALE':
+      return 'Feminino';
+    default:
+      return gender;
+  }
+};
+
+
 type User = {
     id: string;
     name: string;
@@ -15,7 +29,12 @@ type User = {
     role: string;
     status: string;
     crm: string | null;
-    imageUrl: string | null;
+    profileImage: string | null;
+    specialty: string | null;
+    bi: string;
+    dateOfBirth: string;
+    gender: string;
+    address: string;
   }
   
   export default function PendingRegistrationsPage() {
@@ -67,6 +86,7 @@ type User = {
     if (session?.user?.role !== 'ADMIN') {
       return null
     }
+
   
     return (
       <div className="container mx-auto p-4">
@@ -78,10 +98,15 @@ type User = {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Nome</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>CRM</TableHead>
-                  <TableHead>Ações</TableHead>
+                <TableHead>Nome</TableHead>
+                <TableHead>Email</TableHead>
+                <TableHead>Nº Ordem dos Médicos</TableHead>
+                <TableHead>Especialidade</TableHead>
+                <TableHead>BI</TableHead>
+                <TableHead>Data de Nascimento</TableHead>
+                <TableHead>Gênero</TableHead>
+                <TableHead>Endereço</TableHead>
+                <TableHead>Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -92,7 +117,7 @@ type User = {
                         <div className="avatar">
                           <div className="mask mask-squircle w-12 h-12">
                             <Image
-                              src={user.imageUrl || '/placeholder.svg'}
+                              src={user.profileImage || '/placeholder.svg'}
                               alt={`Profile picture of ${user.name}`}
                               width={48}
                               height={48}
@@ -106,6 +131,11 @@ type User = {
                     </TableCell>
                     <TableCell>{user.email}</TableCell>
                     <TableCell>{user.crm || 'Não informado'}</TableCell>
+                    <TableCell>{user.specialty || 'Não informado'}</TableCell>
+                    <TableCell>{user.bi}</TableCell>
+                    <TableCell>{new Date(user.dateOfBirth).toLocaleDateString()}</TableCell>
+                    <TableCell>{translateGender(user.gender)}</TableCell>
+                    <TableCell>{user.address}</TableCell>
                     <TableCell>
                       <Button onClick={() => handleApprove(user.id)} className="mr-2">Aprovar</Button>
                       <Button onClick={() => handleReject(user.id)} variant="destructive">Rejeitar</Button>

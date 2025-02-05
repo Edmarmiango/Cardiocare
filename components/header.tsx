@@ -3,13 +3,33 @@
 import Link from "next/link"
 import { useSession, signOut } from "next-auth/react"
 import { Button } from "../components/ui/button"
-import { useEffect } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { MessageCircle } from 'lucide-react'
+import { Avatar, AvatarImage, AvatarFallback } from "../components/ui/avatar"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "../components/ui/dropdown-menu"
 
 export function Header() {
  const { data: session, status } = useSession()
  const router = useRouter()
+
+ const [profileImage, setProfileImage] = useState<string | null>(null);
+
+ useEffect(() => {
+  console.log('Session:', session); // For debugging
+  if (session?.user?.image) {
+    setProfileImage(session.user.image);
+  } else if (session?.user?.profileImage) {
+    setProfileImage(session.user.profileImage);
+  } else {
+    setProfileImage('/placeholder.svg'); // Fallback image
+  }
+}, [session]);
 
  useEffect(() => {
    // Verificação periódica da validade da sessão
@@ -47,16 +67,24 @@ export function Header() {
            <Link href="/admin/manage-users" className="text-sm font-medium">
              Excluir Usuários
            </Link>
-           <Button variant="outline" onClick={handleSignOut}>
-             Sair
-           </Button>
+           <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Avatar className="h-8 w-8 cursor-pointer">
+                  <AvatarImage src={profileImage || '/placeholder.svg'} alt={session?.user?.name || 'User'} />
+                  <AvatarFallback>{session?.user?.name?.[0] || 'U'}</AvatarFallback>
+                </Avatar>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={handleSignOut}>Sair</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
          </nav>
        </div>
      </header>
    )
  }
 
- // Renderiza navegação para outros usuários
+ // Renderiza navegação para médicos
  if (session?.user?.role === 'DOCTOR') {
  return (
    <header className="w-full border-b">
@@ -72,6 +100,9 @@ export function Header() {
          
          {status === 'authenticated' ? (
            <>
+             <Link href="/doctor/dashboard" className="text-sm font-medium">
+               Dashboard
+             </Link>
              <Link href="/prediction" className="text-sm font-medium">
                Predição
              </Link>
@@ -83,17 +114,25 @@ export function Header() {
              </Link>
              <Link href="/chat" className="text-sm font-medium flex items-center">
                <MessageCircle className="mr-2 h-4 w-4" />
-               Chat Seguro
+               Chat
              </Link>
              {status === 'authenticated' && session.user.role === 'DOCTOR' && (
             <Link href="/doctor/shared-health-data" className="text-sm font-medium">
               Dados Compartilhados
             </Link>
-            
-          )}
-             <Button variant="outline" onClick={handleSignOut}>
-               Sair
-             </Button>
+            )}
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Avatar className="h-8 w-8 cursor-pointer">
+                  <AvatarImage src={profileImage || '/placeholder.svg'} alt={session?.user?.name || 'User'} />
+                  <AvatarFallback>{session?.user?.name?.[0] || 'U'}</AvatarFallback>
+                </Avatar>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={handleSignOut}>Sair</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
            </>
          ) : (
            <>
@@ -111,7 +150,7 @@ export function Header() {
  )}
 
 
- // Renderiza navegação para outros usuários
+ // Renderiza navegação para paciente
  return (
   <header className="w-full border-b">
     <div className="container mx-auto flex h-16 items-center justify-between px-4">
@@ -126,6 +165,9 @@ export function Header() {
         
         {status === 'authenticated' ? (
           <>
+            <Link href="/patient/dashboard" className="text-sm font-medium">
+               Dashboard
+             </Link>
             <Link href="/prediction" className="text-sm font-medium">
               Predição
             </Link>
@@ -140,11 +182,20 @@ export function Header() {
             </Link>
             <Link href="/chat" className="text-sm font-medium flex items-center">
                <MessageCircle className="mr-2 h-4 w-4" />
-               Chat Seguro
+               Chat
              </Link>
-            <Button variant="outline" onClick={handleSignOut}>
-              Sair
-            </Button>
+    
+             <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Avatar className="h-8 w-8 cursor-pointer">
+                  <AvatarImage src={profileImage || '/placeholder.svg' } alt={session?.user?.name || 'User'} />
+                  <AvatarFallback>{session?.user?.name?.[0] || 'U'}</AvatarFallback>
+                </Avatar>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={handleSignOut}>Sair</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </>
         ) : (
           <>

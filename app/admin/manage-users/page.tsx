@@ -15,7 +15,7 @@ type User = {
     role: string;
     status: string;
     crm: string | null;
-    imageUrl: string | null;
+    profileImage: string | null;
   }
   
   export default function ManageUsersPage() {
@@ -88,7 +88,7 @@ type User = {
                         <div className="avatar">
                           <div className="mask mask-squircle w-12 h-12">
                             <Image
-                              src={user.imageUrl || '/placeholder.svg'}
+                              src={user.profileImage || '/placeholder.svg'}
                               alt={`Profile picture of ${user.name}`}
                               width={48}
                               height={48}

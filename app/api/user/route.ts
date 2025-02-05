@@ -20,6 +20,7 @@ export async function GET(request: Request) {
         email: true,
         role: true,
         status: true,
+        profileImage: true
       },
     })
     return NextResponse.json(users)

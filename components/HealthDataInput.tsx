@@ -5,21 +5,28 @@ import { Label } from "../components/ui/label"
 import { toast } from "../components/ui/use-toast"
 
 interface HealthData {
-  date: string;
-  systolic: number;
-  diastolic: number;
-  heartRate: number;
-  glucose: number;
-  cholesterol: number;
+  date: string
+  systolic: number
+  diastolic: number
+  heartRate: number
+  glucose: number
+  cholesterol: number
 }
 
 interface HealthDataInputProps {
-  onSubmit: (data: HealthData) => void;
+  onSubmit: (data: HealthData) => void
+  disabled?: boolean
+  dataSource: {
+    bloodPressure: "manual" | "googleFit"
+    heartRate: "manual" | "googleFit"
+    glucose: "manual" | "googleFit"
+    cholesterol: "manual" | "googleFit"
+  }
 }
 
-export function HealthDataInput({ onSubmit }: HealthDataInputProps) {
+export function HealthDataInput({ onSubmit, disabled = false, dataSource }: HealthDataInputProps) {
   const [formData, setFormData] = useState<HealthData>({
-    date: new Date().toISOString().split('T')[0],
+    date: new Date().toISOString().split("T")[0],
     systolic: 0,
     diastolic: 0,
     heartRate: 0,
@@ -29,16 +36,16 @@ export function HealthDataInput({ onSubmit }: HealthDataInputProps) {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
-    setFormData(prev => ({ ...prev, [name]: name === 'date' ? value : Number(value) }))
+    setFormData((prev) => ({ ...prev, [name]: name === "date" ? value : Number(value) }))
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     try {
-      const response = await fetch('/api/health-data', {
-        method: 'POST',
+      const response = await fetch("/api/health-data", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify(formData),
       })
@@ -46,12 +53,12 @@ export function HealthDataInput({ onSubmit }: HealthDataInputProps) {
       if (response.ok) {
         onSubmit(formData)
         toast({
-          title: "Success",
-          description: "Health data submitted successfully",
+          title: "Sucesso",
+          description: "Dados de saúde registrados com sucesso",
         })
         // Reset form
         setFormData({
-          date: new Date().toISOString().split('T')[0],
+          date: new Date().toISOString().split("T")[0],
           systolic: 0,
           diastolic: 0,
           heartRate: 0,
@@ -59,13 +66,13 @@ export function HealthDataInput({ onSubmit }: HealthDataInputProps) {
           cholesterol: 0,
         })
       } else {
-        throw new Error('Failed to submit health data')
+        throw new Error("Falha ao registrar dados de saúde")
       }
     } catch (error) {
-      console.error('Error submitting health data:', error)
+      console.error("Error submitting health data:", error)
       toast({
-        title: "Error",
-        description: "Failed to submit health data",
+        title: "Erro",
+        description: "Falha ao registrar dados de saúde",
         variant: "destructive",
       })
     }
@@ -74,73 +81,86 @@ export function HealthDataInput({ onSubmit }: HealthDataInputProps) {
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
-        <Label htmlFor="date">Data</Label>
+        <label htmlFor="date">Data</label>
         <Input
+          type="date"
           id="date"
           name="date"
-          type="date"
           value={formData.date}
           onChange={handleChange}
           required
+          disabled={disabled}
         />
       </div>
       <div>
-        <Label htmlFor="systolic">Pressão Arterial Sistólica</Label>
+        <label htmlFor="systolic">Pressão Sistólica</label>
         <Input
+          type="number"
           id="systolic"
           name="systolic"
-          type="number"
           value={formData.systolic}
           onChange={handleChange}
           required
+          disabled={disabled}
         />
       </div>
       <div>
-        <Label htmlFor="diastolic">Pressão Arterial Diastólica</Label>
+        <label htmlFor="diastolic">Pressão Diastólica</label>
         <Input
+          type="number"
           id="diastolic"
           name="diastolic"
-          type="number"
           value={formData.diastolic}
           onChange={handleChange}
           required
+          disabled={disabled}
         />
       </div>
       <div>
-        <Label htmlFor="heartRate">Frequência Cardíaca</Label>
+        <label htmlFor="heartRate">Frequência Cardíaca</label>
         <Input
+          type="number"
           id="heartRate"
           name="heartRate"
-          type="number"
           value={formData.heartRate}
           onChange={handleChange}
           required
+          disabled={disabled}
         />
       </div>
       <div>
-        <Label htmlFor="glucose">Glicose</Label>
+        <label htmlFor="glucose">Glicose</label>
         <Input
+          type="number"
           id="glucose"
           name="glucose"
-          type="number"
           value={formData.glucose}
           onChange={handleChange}
           required
+          disabled={disabled}
         />
       </div>
       <div>
-        <Label htmlFor="cholesterol">Colesterol</Label>
+        <Label htmlFor="cholesterol">
+          Colesterol
+          <span className="ml-2 text-xs text-muted-foreground">(Entrada Manual)</span>
+        </Label>
         <Input
+          type="number"
           id="cholesterol"
           name="cholesterol"
-          type="number"
           value={formData.cholesterol}
           onChange={handleChange}
           required
+          disabled={disabled}
         />
+        <p className="text-xs text-muted-foreground mt-1">
+          O Google Fit não fornece dados de colesterol. Por favor, insira manualmente.
+        </p>
       </div>
-      <Button type="submit">Enviar Dados</Button>
+      <Button type="submit" disabled={disabled}>
+        Registrar Dados
+      </Button>
     </form>
   )
 }
-

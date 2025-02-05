@@ -14,7 +14,7 @@ export async function GET() {
         id: true,
         name: true,
         specialty: true,
-        imageUrl: true
+        profileImage: true
       },
       take: 3
     })

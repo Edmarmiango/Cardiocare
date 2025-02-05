@@ -1,7 +1,8 @@
 'use client'
-import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card"
 import Link from "next/link"
 import { ReminderManager } from './ReminderManager'
+import { Button } from "../components/ui/button"
 
 export default function DoctorDashboard() {
   return (
@@ -13,10 +14,10 @@ export default function DoctorDashboard() {
             <CardTitle>Próximas Consultas</CardTitle>
           </CardHeader>
           <CardContent>
-            <p>Veja suas próximas consultas agendadas.</p>
-            <Link href="/consultas" className="text-blue-500 hover:underline">
-              Ver consultas
-            </Link>
+          <CardDescription>Veja suas próximas consultas agendadas.</CardDescription>
+            <Button asChild className="mt-4">
+              <Link href="/telemedicine">Ver consultas</Link>
+            </Button>
           </CardContent>
         </Card>
         <Card>
@@ -24,10 +25,10 @@ export default function DoctorDashboard() {
             <CardTitle>Pacientes</CardTitle>
           </CardHeader>
           <CardContent>
-            <p>Gerencie seus pacientes e veja seus históricos médicos.</p>
-            <Link href="/pacientes" className="text-blue-500 hover:underline">
-              Ver pacientes
-            </Link>
+          <CardDescription>Gerencie seus pacientes e veja seus históricos médicos.</CardDescription>
+            <Button asChild className="mt-4">
+              <Link href="/doctor/patients">Ver pacientes</Link>
+            </Button>
           </CardContent>
         </Card>
         <Card>
@@ -35,10 +36,10 @@ export default function DoctorDashboard() {
             <CardTitle>Prescrições</CardTitle>
           </CardHeader>
           <CardContent>
-            <p>Crie e gerencie prescrições médicas.</p>
-            <Link href="/prescricoes" className="text-blue-500 hover:underline">
-              Gerenciar prescrições
-            </Link>
+          <CardDescription>Crie e gerencie prescrições médicas.</CardDescription>
+            <Button asChild className="mt-4">
+              <Link href="/prescriptions">Gerenciar prescrições</Link>
+            </Button>
           </CardContent>
         </Card>
         <Card>
@@ -46,10 +47,10 @@ export default function DoctorDashboard() {
             <CardTitle>Análise de Dados</CardTitle>
           </CardHeader>
           <CardContent>
-            <p>Acesse análises e estatísticas dos seus pacientes.</p>
-            <Link href="/analise" className="text-blue-500 hover:underline">
-              Ver análises
-            </Link>
+          <CardDescription>Acesse análises e estatísticas dos seus pacientes.</CardDescription>
+            <Button asChild className="mt-4">
+              <Link href="/analysis">Ver análises</Link>
+            </Button>
           </CardContent>
         </Card>
       </div>

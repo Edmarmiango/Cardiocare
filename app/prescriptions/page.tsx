@@ -8,7 +8,7 @@ import { Input } from "../../components/ui/input"
 import { Label } from "../../components/ui/label"
 import { Textarea } from "../../components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select"
-import { toast } from "../../components/ui/use-toast"
+import { useToast } from '../../components/ui/use-toast'
 import { createReminderAction } from '../../app/actions/reminders'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/tabs"
 import { Alert, AlertDescription, AlertTitle } from "../../components/ui/alert"
@@ -54,6 +54,7 @@ export default function PrescriptionsPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('ACTIVE')
   const [error, setError] = useState<string | null>(null)
+  const { toast } = useToast()
 
   useEffect(() => {
     if (status === 'authenticated') {
@@ -65,7 +66,6 @@ export default function PrescriptionsPage() {
   }, [status, session, activeTab])
 
   const fetchPrescriptions = async (status: string) => {
-    setError(null)
     try {
       const response = await fetch(`/api/prescriptions?status=${status}`)
       if (response.ok) {
@@ -73,18 +73,15 @@ export default function PrescriptionsPage() {
         setPrescriptions(data)
       } else {
         const errorData = await response.json()
-        const errorMessage = errorData.error || 'Failed to fetch prescriptions'
-        throw new Error(errorMessage)
+        throw new Error(errorData.error || "Failed to fetch prescriptions")
       }
     } catch (error) {
-      console.error('Error fetching prescriptions:', error)
-      const errorMessage = error instanceof Error ? error.message : 'Failed to fetch prescriptions'
+      console.error("Error fetching prescriptions:", error)
       toast({
         title: "Error",
-        description: errorMessage,
+        description: error instanceof Error ? error.message : "Failed to fetch prescriptions",
         variant: "destructive",
       })
-      setError(errorMessage)
     } finally {
       setIsLoading(false)
     }
@@ -109,9 +106,89 @@ export default function PrescriptionsPage() {
     }
   }
 
+  const createReminders = async (prescription: typeof newPrescription) => {
+    if (!prescription.patientId) {
+      console.error("Patient ID is missing for reminder creation")
+      return []
+    }
+
+    const startDateTime = new Date(prescription.startDate)
+    const endDateTime = prescription.endDate ? new Date(prescription.endDate) : null
+    const reminderResults = []
+
+     // Ajustar o horário inicial dependendo da frequência
+      if (prescription.frequency === "três vezes ao dia (8 em 8 horas)") {
+        startDateTime.setHours(6, 0, 0, 0); // Iniciar em 6h para essa frequência
+      } else {
+        startDateTime.setHours(8, 0, 0, 0); // Para outras frequências, se necessário
+      }
+
+    while (!endDateTime || startDateTime <= endDateTime) {
+      const reminderData = {
+        userId: prescription.patientId,
+        type: "medication" as const,
+        title: `Tomar ${prescription.medication}`,
+        description: `Dosagem: ${prescription.dosage}. ${prescription.instructions}`,
+        datetime: startDateTime.toISOString(),
+        createdBy: session?.user?.id || "",
+      }
+
+      console.log("Sending reminder data:", reminderData)
+
+      const reminderResult = await createReminderAction(reminderData)
+
+      reminderResults.push(reminderResult)
+      console.log("Reminder creation result:", reminderResult)
+
+      // Increment the date based on frequency
+      if (prescription.frequency === "uma vez por dia (manhã)") {
+        startDateTime.setDate(startDateTime.getDate() + 1)
+        startDateTime.setHours(8, 0, 0, 0)
+      }else if(prescription.frequency === "uma vez por dia (Tarde)"){
+        startDateTime.setDate(startDateTime.getDate() + 1)
+        startDateTime.setHours(14, 0, 0, 0)
+      }else if(prescription.frequency === "uma vez por dia (Noite)"){
+        startDateTime.setDate(startDateTime.getDate() + 1)
+        startDateTime.setHours(20, 0, 0, 0)
+      } else if (prescription.frequency === "duas vezes ao dia (12 em 12 horas)") {
+        if (startDateTime.getHours() < 20) {
+          startDateTime.setHours(20, 0, 0, 0)
+        } else {
+          startDateTime.setDate(startDateTime.getDate() + 1)
+          startDateTime.setHours(8, 0, 0, 0)
+        }
+      } else if (prescription.frequency === "três vezes ao dia (6 em 6 horas)") {
+        if (startDateTime.getHours() === 8) {
+          startDateTime.setHours(14, 0, 0, 0)
+        } else if (startDateTime.getHours() === 14) {
+          startDateTime.setHours(20, 0, 0, 0)
+        } else {
+          startDateTime.setDate(startDateTime.getDate() + 1)
+          startDateTime.setHours(8, 0, 0, 0)
+        }
+      } else if (prescription.frequency === "três vezes ao dia (8 em 8 horas)") {
+        if (startDateTime.getHours() === 6) {
+          startDateTime.setHours(14, 0, 0, 0);
+        } else if (startDateTime.getHours() === 14) {
+          startDateTime.setHours(22, 0, 0, 0);
+        } else {
+          startDateTime.setDate(startDateTime.getDate() + 1);
+          startDateTime.setHours(6, 0, 0, 0);
+        }
+    
+      } else {
+        // If frequency is not recognized, create only one reminder
+        console.error(`Frequência desconhecida: ${prescription.frequency}`);
+        break
+      }
+    }
+
+    return reminderResults
+  }
+
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault()
-  
+
     if (session?.user.role !== "DOCTOR") {
       toast({
         title: "Error",
@@ -120,8 +197,7 @@ export default function PrescriptionsPage() {
       })
       return
     }
-  
-    // Validate form data
+
     if (
       !newPrescription.patientId ||
       !newPrescription.medication ||
@@ -137,11 +213,8 @@ export default function PrescriptionsPage() {
       })
       return
     }
-  
+
     try {
-      // Log the request payload for debugging
-      console.log("Sending prescription data:", newPrescription)
-  
       const response = await fetch("/api/prescriptions", {
         method: "POST",
         headers: {
@@ -149,72 +222,53 @@ export default function PrescriptionsPage() {
         },
         body: JSON.stringify(newPrescription),
       })
-  
-      // Log the response status and headers for debugging
-      console.log("Response status:", response.status)
-      console.log("Response headers:", Object.fromEntries(response.headers.entries()))
-  
+
       if (!response.ok) {
         const errorData = await response.json()
         throw new Error(errorData.error || "Failed to create prescription")
       }
-  
+
       const prescriptionData = await response.json()
-  
-      // Create reminders for the medication
-      try {
-        const startDate = new Date(prescriptionData.startDate)
-        const endDate = prescriptionData.endDate ? new Date(prescriptionData.endDate) : null
-        const [frequency, period] = prescriptionData.frequency.split(" ")
-  
-        const currentDate = new Date(startDate)
-        while (!endDate || currentDate <= endDate) {
-          const reminderResult = await createReminderAction({
-            userId: prescriptionData.userId,
-            type: "medication",
-            title: `Take ${prescriptionData.medication}`,
-            description: `Dosage: ${prescriptionData.dosage}. ${prescriptionData.instructions}`,
-            datetime: new Date(currentDate),
-          })
-  
-          if (!reminderResult.success) {
-            throw new Error("Failed to create reminders")
-          }
-  
-          // Move to the next occurrence based on frequency
-          if (period === "daily") {
-            currentDate.setDate(currentDate.getDate() + 1)
-          } else if (period === "weekly") {
-            currentDate.setDate(currentDate.getDate() + 7)
-          } else if (period === "monthly") {
-            currentDate.setMonth(currentDate.getMonth() + 1)
-          }
-        }
-  
+
+      // Create reminders
+      const reminderResults = await createReminders(newPrescription)
+      console.log("Reminder creation results:", reminderResults)
+
+      const allRemindersCreated = reminderResults.every((result) => result.success)
+      const failedReminders = reminderResults.filter((result) => !result.success).length
+
+      if (allRemindersCreated) {
         toast({
-          title: "Success",
-          description: "Prescription created successfully. Reminders have been set.",
+          title: "Sucesso",
+          description: "Prescrição criada e todos os lembretes configurados com sucesso.",
         })
-  
-        // Reset form and refresh data
-        fetchPrescriptions(activeTab)
-        setNewPrescription({
-          patientId: "",
-          medication: "",
-          dosage: "",
-          frequency: "",
-          instructions: "",
-          startDate: "",
-          endDate: "",
-        })
-      } catch (reminderError) {
-        console.error("Error creating reminders:", reminderError)
+      } else if (reminderResults.length > 0) {
         toast({
-          title: "Warning",
-          description: "Prescription created but failed to set reminders",
-          variant: "destructive",
+          title: "Sucesso Parcial",
+          description: `Prescrição criada, mas ${failedReminders} lembrete(s) falharam ao serem configurados. Por favor, verifique e configure-os manualmente se necessário.`,
+          variant: "warning",
+        })
+      } else {
+        toast({
+          title: "Aviso",
+          description: "Prescrição criada, mas nenhum lembrete foi configurado. Por favor, configure-os manualmente.",
+          variant: "warning",
         })
       }
+
+      // Clear the form
+      setNewPrescription({
+        patientId: "",
+        medication: "",
+        dosage: "",
+        frequency: "",
+        instructions: "",
+        startDate: "",
+        endDate: "",
+      })
+
+      // Refresh the prescriptions list
+      fetchPrescriptions(activeTab)
     } catch (error) {
       console.error("Error creating prescription:", error)
       toast({
@@ -224,6 +278,7 @@ export default function PrescriptionsPage() {
       })
     }
   }
+
 
   const handleStatusChange = async (prescriptionId: string, newStatus: 'ACTIVE' | 'COMPLETED' | 'ARCHIVED') => {
     try {
@@ -238,7 +293,7 @@ export default function PrescriptionsPage() {
       if (response.ok) {
         toast({
           title: "Success",
-          description: "Prescription status updated successfully.",
+          description: "Status da prescrição atualizado com sucesso.",
         })
         fetchPrescriptions(activeTab)
       } else {
@@ -248,7 +303,7 @@ export default function PrescriptionsPage() {
       console.error('Error updating prescription status:', error)
       toast({
         title: "Error",
-        description: "Failed to update prescription status",
+        description: "Falha ao atualizar o status da prescrição",
         variant: "destructive",
       })
     }
@@ -277,7 +332,7 @@ export default function PrescriptionsPage() {
               {session?.user.role === 'DOCTOR' && prescription.user && (
                 <p><strong>Paciente:</strong> {prescription.user.name}</p>
               )}
-              {session?.user.role === 'DOCTOR' && (
+       
                 <div className="mt-4">
                   <Select
                     value={prescription.status}
@@ -293,7 +348,7 @@ export default function PrescriptionsPage() {
                     </SelectContent>
                   </Select>
                 </div>
-              )}
+              
             </CardContent>
           </Card>
         ))}
@@ -303,8 +358,12 @@ export default function PrescriptionsPage() {
     );
   };
 
-  if (isLoading) {
+  if (status === "loading") {
     return <div>Loading...</div>
+  }
+
+  if (!session) {
+    return <div>Please log in to view prescriptions.</div>
   }
 
   return (
@@ -317,20 +376,18 @@ export default function PrescriptionsPage() {
       )}
       <h1 className="text-2xl font-bold mb-4">Prescrições</h1>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-4">
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
-          <TabsTrigger value="ACTIVE">Activo</TabsTrigger>
-          <TabsTrigger value="COMPLETED">Concluído</TabsTrigger>
-          <TabsTrigger value="ARCHIVED">Arquivado</TabsTrigger>
+          <TabsTrigger value="ACTIVE">Ativas</TabsTrigger>
+          <TabsTrigger value="COMPLETED">Concluídas</TabsTrigger>
+          <TabsTrigger value="ARCHIVED">Arquivadas</TabsTrigger>
         </TabsList>
-        <TabsContent value="ACTIVE">
-          {renderPrescriptions('ACTIVE')}
-        </TabsContent>
+        <TabsContent value="ACTIVE">{isLoading ? <div>Carregando...</div> : renderPrescriptions("ACTIVE")}</TabsContent>
         <TabsContent value="COMPLETED">
-          {renderPrescriptions('COMPLETED')}
+          {isLoading ? <div>Carregando...</div> : renderPrescriptions("COMPLETED")}
         </TabsContent>
         <TabsContent value="ARCHIVED">
-          {renderPrescriptions('ARCHIVED')}
+          {isLoading ? <div>Carregando...</div> : renderPrescriptions("ARCHIVED")}
         </TabsContent>
       </Tabs>
 
@@ -377,12 +434,22 @@ export default function PrescriptionsPage() {
               </div>
               <div>
                 <Label htmlFor="frequency">Frequência</Label>
-                <Input
-                  id="frequency"
+                <Select
                   value={newPrescription.frequency}
-                  onChange={(e) => setNewPrescription({...newPrescription, frequency: e.target.value})}
-                  required
-                />
+                  onValueChange={(value) => setNewPrescription({ ...newPrescription, frequency: value })}
+                >
+                  <SelectTrigger id="frequency">
+                    <SelectValue placeholder="Selecione a frequência" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="uma vez por dia (manhã)">Uma vez por dia (8h00)</SelectItem>
+                    <SelectItem value="uma vez por dia (Tarde)">Uma vez por dia (14h00)</SelectItem>
+                    <SelectItem value="uma vez por dia (Noite)">Uma vez por dia (20h00)</SelectItem>
+                    <SelectItem value="duas vezes ao dia (12 em 12 horas)">Duas vezes ao dia (8h00 e 20h00)</SelectItem>
+                    <SelectItem value="três vezes ao dia (6 em 6 horas)">Três vezes ao dia (8h00, 14h00 e 20h00)</SelectItem>
+                    <SelectItem value="três vezes ao dia (8 em 8 horas)">Três vezes ao dia (6h00, 14h00 e 22h00)</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               <div>
                 <Label htmlFor="instructions">Instruções</Label>

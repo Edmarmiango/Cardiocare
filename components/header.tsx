@@ -6,30 +6,73 @@ import { Button } from "../components/ui/button"
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { MessageCircle } from 'lucide-react'
+import { UserAvatar } from "./UserAvatar"
 import { Avatar, AvatarImage, AvatarFallback } from "../components/ui/avatar"
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
-  DropdownMenuTrigger,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuShortcut,
+  DropdownMenuTrigger
 } from "../components/ui/dropdown-menu"
+
+interface UserData {
+  name: string
+  email: string
+  profileImage: string | null
+}
 
 export function Header() {
  const { data: session, status } = useSession()
  const router = useRouter()
+ const [userData, setUserData] = useState<UserData | null>(null)
+ const [isLoading, setIsLoading] = useState(true)
 
- const [profileImage, setProfileImage] = useState<string | null>(null);
 
  useEffect(() => {
-  console.log('Session:', session); // For debugging
-  if (session?.user?.image) {
-    setProfileImage(session.user.image);
-  } else if (session?.user?.profileImage) {
-    setProfileImage(session.user.profileImage);
+  if (session?.user?.id) {
+    setIsLoading(true)
+    fetch("/api/user/profile")
+      .then((res) => res.json())
+      .then((data) => {
+        console.log("Fetched user data:", data)
+        setUserData(data)
+      })
+      .catch((error) => {
+        console.error("Error fetching user data:", error)
+        setUserData(null)
+      })
+      .finally(() => setIsLoading(false))
   } else {
-    setProfileImage('/placeholder.svg'); // Fallback image
+    setIsLoading(false)
+    setUserData(null)
   }
-}, [session]);
+}, [session])
+
+
+
+const renderAvatar = () => {
+  if (isLoading) {
+    return <div className="w-10 h-10 bg-gray-200 rounded-full animate-pulse"></div>
+  }
+
+  if (userData && userData.name) {
+    return (
+      <UserAvatar
+        user={{
+          name: userData.name,
+          profileImage: userData.profileImage || "",
+        }}
+        className="w-10 h-10"
+      />
+    )
+  }
+
+  return <div className="w-10 h-10 bg-gray-200 rounded-full"></div>
+}
 
  useEffect(() => {
    // Verificação periódica da validade da sessão
@@ -69,10 +112,17 @@ export function Header() {
            </Link>
            <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Avatar className="h-8 w-8 cursor-pointer">
-                  <AvatarImage src={profileImage || '/placeholder.svg'} alt={session?.user?.name || 'User'} />
-                  <AvatarFallback>{session?.user?.name?.[0] || 'U'}</AvatarFallback>
-                </Avatar>
+                <Avatar className="cursor-pointer">
+                      {session?.user && (
+                      <UserAvatar
+                        user={{
+                          name: session.user.name || "",
+                          profileImage: session.user.image || "",
+                        }}
+                        className="w-10 h-10"
+                      />
+                    )}
+                  </Avatar>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuItem onClick={handleSignOut}>Sair</DropdownMenuItem>
@@ -124,14 +174,35 @@ export function Header() {
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Avatar className="h-8 w-8 cursor-pointer">
-                  <AvatarImage src={profileImage || '/placeholder.svg'} alt={session?.user?.name || 'User'} />
-                  <AvatarFallback>{session?.user?.name?.[0] || 'U'}</AvatarFallback>
-                </Avatar>
+                <Avatar className="cursor-pointer">
+                   {renderAvatar()}
+                  </Avatar>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={handleSignOut}>Sair</DropdownMenuItem>
-              </DropdownMenuContent>
+              <DropdownMenuContent className="w-56" align="end" forceMount>
+                  <DropdownMenuLabel className="font-normal">
+                    <div className="flex flex-col space-y-1">
+                      <p className="text-sm font-medium leading-none">{session?.user?.name}</p>
+                      <p className="text-xs leading-none text-muted-foreground">{session?.user?.email}</p>
+                    </div>
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuGroup>
+                    <DropdownMenuItem asChild>
+                      <Link href="/profile">Perfil</Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link href="/profile/edit">Editar Perfil</Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link href="/settings">Configurações</Link>
+                    </DropdownMenuItem>
+                  </DropdownMenuGroup>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem className="cursor-pointer" onSelect={handleSignOut}>
+                    Sair
+                    <DropdownMenuShortcut>⇧⌘Q</DropdownMenuShortcut>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
             </DropdownMenu>
            </>
          ) : (
@@ -187,14 +258,35 @@ export function Header() {
     
              <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Avatar className="h-8 w-8 cursor-pointer">
-                  <AvatarImage src={profileImage || '/placeholder.svg' } alt={session?.user?.name || 'User'} />
-                  <AvatarFallback>{session?.user?.name?.[0] || 'U'}</AvatarFallback>
+                <Avatar className="cursor-pointer">
+                    {renderAvatar()}
                 </Avatar>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={handleSignOut}>Sair</DropdownMenuItem>
-              </DropdownMenuContent>
+              <DropdownMenuContent className="w-56" align="end" forceMount>
+                  <DropdownMenuLabel className="font-normal">
+                    <div className="flex flex-col space-y-1">
+                      <p className="text-sm font-medium leading-none">{session?.user?.name}</p>
+                      <p className="text-xs leading-none text-muted-foreground">{session?.user?.email}</p>
+                    </div>
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuGroup>
+                    <DropdownMenuItem asChild>
+                      <Link href="/profile">Perfil</Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link href="/profile/edit">Editar Perfil</Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link href="/settings">Configurações</Link>
+                    </DropdownMenuItem>
+                  </DropdownMenuGroup>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem className="cursor-pointer" onSelect={handleSignOut}>
+                    Sair
+                    <DropdownMenuShortcut>⇧⌘Q</DropdownMenuShortcut>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
             </DropdownMenu>
           </>
         ) : (

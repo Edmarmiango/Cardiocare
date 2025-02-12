@@ -70,6 +70,29 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
+    // Verificar se já existe um horário conflitante
+    const conflictingSlot = await prisma.timeSlot.findFirst({
+      where: {
+        doctorId: session.user.id,
+        date: new Date(date),
+        OR: [
+          {
+            AND: [{ startTime: { lte: startTime } }, { endTime: { gt: startTime } }],
+          },
+          {
+            AND: [{ startTime: { lt: endTime } }, { endTime: { gte: endTime } }],
+          },
+          {
+            AND: [{ startTime: { gte: startTime } }, { endTime: { lte: endTime } }],
+          },
+        ],
+      },
+    })
+
+    if (conflictingSlot) {
+      return NextResponse.json({ error: "Já existe uma disponibilidade neste intervalo de tempo." }, { status: 400 })
+    }
+
     const timeSlot = await prisma.timeSlot.create({
       data: {
         doctorId: session.user.id,

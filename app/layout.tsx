@@ -23,6 +23,7 @@ export default function RootLayout({
           <Header />
           <main>
             {children}
+            <Toaster />
           </main>
         </ClientSessionProvider>
       </body>

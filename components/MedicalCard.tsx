@@ -5,16 +5,16 @@ type Doctor = {
   id: string
   name: string
   specialty: string | null
-  imageUrl: string | null
+  profileImage: string | null
 }
 
 export function MedicalCard({ doctor }: { doctor: Doctor }) {
   return (
     <Card>
       <CardHeader>
-        {doctor.imageUrl ? (
+        {doctor.profileImage ? (
           <Image
-            src={doctor.imageUrl}
+            src={doctor.profileImage}
             alt={doctor.name}
             width={100}
             height={100}

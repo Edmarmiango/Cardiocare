@@ -6,8 +6,8 @@ import { Button } from "../components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card"
 import { Label } from "../components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select"
-import { toast } from "../components/ui/use-toast"
-import { format } from 'date-fns'
+import { useToast } from "../components/ui/use-toast"
+import { format, parseISO  } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { Loader2 } from 'lucide-react'
 import { createReminder } from "../lib/reminderService"
@@ -33,27 +33,27 @@ interface AppointmentBookingProps {
 export function AppointmentBooking({ onAppointmentCreated }: AppointmentBookingProps) {
   const { data: session } = useSession()
   const [doctors, setDoctors] = useState<Doctor[]>([])
-  const [selectedDoctor, setSelectedDoctor] = useState<string>('')
+  const [selectedDoctor, setSelectedDoctor] = useState<string>("")
   const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([])
-  const [selectedSlot, setSelectedSlot] = useState<string>('')
-  const [selectedSpecialty, setSelectedSpecialty] = useState<string>('')
+  const [selectedSlot, setSelectedSlot] = useState<string>("")
+  const [selectedSpecialty, setSelectedSpecialty] = useState<string>("")
   const [isLoading, setIsLoading] = useState(false)
+  const [needsGoogleAuth, setNeedsGoogleAuth] = useState(false)
+  const { toast } = useToast()
 
   const formatTimeSlot = (slot: TimeSlot) => {
-    const formattedDate = format(new Date(slot.date), "d 'de' MMMM 'de' yyyy", { locale: ptBR })
+    const formattedDate = format(parseISO(slot.date), "d 'de' MMMM 'de' yyyy", { locale: ptBR })
     return `${formattedDate}, ${slot.startTime} - ${slot.endTime}`
   }
 
-  // Extract unique specialties from doctors array
   const specialties = useMemo(() => {
-    const uniqueSpecialties = [...new Set(doctors.map(doctor => doctor.specialty))]
+    const uniqueSpecialties = [...new Set(doctors.map((doctor) => doctor.specialty))]
     return uniqueSpecialties.sort()
   }, [doctors])
 
-  // Filter doctors based on selected specialty
   const filteredDoctors = useMemo(() => {
     if (!selectedSpecialty) return doctors
-    return doctors.filter(doctor => doctor.specialty === selectedSpecialty)
+    return doctors.filter((doctor) => doctor.specialty === selectedSpecialty)
   }, [doctors, selectedSpecialty])
 
   useEffect(() => {
@@ -68,22 +68,21 @@ export function AppointmentBooking({ onAppointmentCreated }: AppointmentBookingP
     }
   }, [selectedDoctor])
 
-  // Reset selected doctor when specialty changes
   useEffect(() => {
-    setSelectedDoctor('')
-    setSelectedSlot('')
-  }, [selectedSpecialty])
+    setSelectedDoctor("")
+    setSelectedSlot("")
+  }, [selectedSpecialty]) //Corrected dependency
 
   const fetchDoctors = async () => {
     try {
-      const response = await fetch('/api/doctors')
+      const response = await fetch("/api/doctors")
       if (!response.ok) {
-        throw new Error('Falha ao buscar médicos')
+        throw new Error("Falha ao buscar médicos")
       }
       const data = await response.json()
       setDoctors(data)
     } catch (error) {
-      console.error('Error fetching doctors:', error)
+      console.error("Error fetching doctors:", error)
       toast({
         title: "Erro",
         description: "Falha ao buscar lista de médicos",
@@ -96,12 +95,12 @@ export function AppointmentBooking({ onAppointmentCreated }: AppointmentBookingP
     try {
       const response = await fetch(`/api/doctor-schedule?doctorId=${doctorId}`)
       if (!response.ok) {
-        throw new Error('Falha ao buscar horários disponíveis')
+        throw new Error("Falha ao buscar horários disponíveis")
       }
       const data = await response.json()
       setTimeSlots(data)
     } catch (error) {
-      console.error('Error fetching time slots:', error)
+      console.error("Error fetching time slots:", error)
       toast({
         title: "Erro",
         description: "Falha ao buscar horários disponíveis",
@@ -122,10 +121,10 @@ export function AppointmentBooking({ onAppointmentCreated }: AppointmentBookingP
 
     setIsLoading(true)
     try {
-      const response = await fetch('/api/appointments', {
-        method: 'POST',
+      const response = await fetch("/api/appointments", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           doctorId: selectedDoctor,
@@ -133,40 +132,71 @@ export function AppointmentBooking({ onAppointmentCreated }: AppointmentBookingP
         }),
       })
 
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.message || 'Falha ao agendar consulta')
+      const data = await response.json()
+
+      if (response.ok) {
+        const appointmentData = data
+
+        // Create a reminder for the appointment
+        const selectedTimeSlot = timeSlots.find((slot) => slot.id === selectedSlot)
+        if (selectedTimeSlot) {
+          const [hours, minutes] = selectedTimeSlot.startTime.split(":").map(Number)
+          const appointmentDate = new Date(selectedTimeSlot.date)
+          appointmentDate.setHours(hours, minutes, 0, 0)
+
+          console.log("Appointment date:", appointmentDate.toISOString()) // Log for debugging
+
+          if (isNaN(appointmentDate.getTime())) {
+            throw new Error("Invalid appointment date")
+          }
+
+          try {
+            await createReminder({
+              userId: session.user.id,
+              type: "appointment",
+              title: `Consulta Online com ${appointmentData.doctor?.name || "Médico"}`,
+              description: "Agendamento de videoconferência",
+              datetime: appointmentDate,
+            })
+            console.log("Reminder created successfully")
+          } catch (reminderError) {
+            console.error("Error creating reminder:", reminderError)
+            toast({
+              title: "Aviso",
+              description: "Consulta agendada, mas houve um erro ao criar o lembrete",
+              variant: "destructive",
+            })
+          }
+        }
+
+        toast({
+          title: "Sucesso",
+          description: "Consulta agendada com sucesso. Um lembrete foi definido.",
+        })
+
+        // Reset form
+        setSelectedDoctor("")
+        setSelectedSlot("")
+        setSelectedSpecialty("")
+        setTimeSlots([])
+
+        // Callback
+        onAppointmentCreated?.()
+      } else if (response.status === 401 && data.error === "Google Calendar authentication required") {
+        setNeedsGoogleAuth(true)
+        toast({
+          title: "Autenticação necessária",
+          description: "Por favor, autentique-se com o Google Calendar para agendar a consulta.",
+          variant: "destructive",
+        })
+      } else {
+        throw new Error(data.error || "Falha ao agendar consulta")
       }
-
-      const appointmentData = await response.json()
-      
-      // Create a reminder for the appointment
-      await createReminder({
-        userId: session.user.id,
-        type: 'appointment',
-        title: `Consulta Online com Dr. ${appointmentData.doctor.name}`,
-        description: 'Agendamento de videoconferência',
-        datetime: new Date(appointmentData.date),
-      })
-
-      toast({
-        title: "Sucesso",
-        description: "Consulta agendada com sucesso. Um lembrete foi definido.",
-      })
-
-      // Reset form
-      setSelectedDoctor('')
-      setSelectedSlot('')
-      setSelectedSpecialty('')
-      setTimeSlots([])
-      
-      // Callback
-      onAppointmentCreated?.()
     } catch (error) {
-      console.error('Error booking appointment:', error)
+      console.error("Error booking appointment:", error)
       toast({
         title: "Erro",
-        description: error instanceof Error ? error.message : 'Ocorreu um erro inesperado',
+        description: error instanceof Error ? error.message : "Ocorreu um erro inesperado",
         variant: "destructive",
       })
     } finally {
@@ -199,11 +229,7 @@ export function AppointmentBooking({ onAppointmentCreated }: AppointmentBookingP
 
           <div>
             <Label htmlFor="doctor">Médico</Label>
-            <Select 
-              value={selectedDoctor} 
-              onValueChange={setSelectedDoctor}
-              disabled={!selectedSpecialty}
-            >
+            <Select value={selectedDoctor} onValueChange={setSelectedDoctor} disabled={!selectedSpecialty}>
               <SelectTrigger>
                 <SelectValue placeholder="Selecione um médico" />
               </SelectTrigger>
@@ -220,8 +246,8 @@ export function AppointmentBooking({ onAppointmentCreated }: AppointmentBookingP
           {selectedDoctor && (
             <div>
               <Label htmlFor="timeSlot">Intervalo de tempo (Duração)</Label>
-              <Select 
-                value={selectedSlot} 
+              <Select
+                value={selectedSlot}
                 onValueChange={setSelectedSlot}
                 disabled={!selectedDoctor || timeSlots.length === 0}
               >
@@ -239,18 +265,14 @@ export function AppointmentBooking({ onAppointmentCreated }: AppointmentBookingP
             </div>
           )}
 
-          <Button 
-            onClick={handleBookAppointment} 
-            disabled={!selectedSlot || isLoading}
-            className="w-full"
-          >
+          <Button onClick={handleBookAppointment} disabled={!selectedSlot || isLoading} className="w-full">
             {isLoading ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 Agendando...
               </>
             ) : (
-              'Agendar consulta'
+              "Agendar consulta"
             )}
           </Button>
         </div>
@@ -258,8 +280,4 @@ export function AppointmentBooking({ onAppointmentCreated }: AppointmentBookingP
     </Card>
   )
 }
-
-
-
-
 

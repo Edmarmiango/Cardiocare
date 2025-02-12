@@ -45,8 +45,6 @@ model User {
   googleFitAccessToken  String?
   googleFitRefreshToken String?
   googleFitTokenExpiry  DateTime?
-  sharedWithDoctors SharedHealthData[] @relation("UserSharedData")
-  sharedFromPatients SharedHealthData[] @relation("DoctorSharedData")
 }
 
 model Appointment {

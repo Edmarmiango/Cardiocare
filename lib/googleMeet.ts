@@ -90,4 +90,3 @@ export async function createGoogleMeetLink(
     throw error;
   }
 }
-

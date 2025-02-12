@@ -171,3 +171,47 @@ export async function POST(request: Request) {
     )
   }
 }
+
+export async function PATCH(request: Request) {
+  const session = await getServerSession(authOptions)
+  if (!session || !session.user) {
+    return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+  }
+  try {
+    const body = await request.json()
+    const { appointmentId, status, cancelReason } = body
+    const appointment = await prisma.appointment.findUnique({
+      where: { id: appointmentId },
+    })
+    if (!appointment) {
+      return NextResponse.json(
+        { error: 'Appointment not found' },
+        { status: 404 }
+      )
+    }
+    // Verify user has permission to update this appointment
+    if (
+      session.user.role === Role.PATIENT && appointment.userId !== session.user.id ||
+      session.user.role === Role.DOCTOR && appointment.doctorId !== session.user.id
+    ) {
+      return NextResponse.json(
+        { error: 'Not authorized' },
+        { status: 403 }
+      )
+    }
+    const updatedAppointment = await prisma.appointment.update({
+      where: { id: appointmentId },
+      data: {
+        status,
+        cancelReason: status === 'CANCELLED' ? cancelReason : null,
+      },
+    })
+    return NextResponse.json(updatedAppointment)
+  } catch (error) {
+    console.error('Error updating appointment:', error)
+    return NextResponse.json(
+      { error: 'Failed to update appointment' },
+      { status: 500 }
+    )
+  }
+}

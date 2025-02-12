@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { useSession } from "next-auth/react"
 import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card"
-import { toast } from "../../components/ui/use-toast"
+import { useToast } from "../../components/ui/use-toast"
 import { HealthDataInput } from "../../components/HealthDataInput"
 import { HealthDataChart } from "../../components/HealthDataChart"
 import { ShareHealthData } from "../../components/ShareHealthData"
@@ -23,15 +23,15 @@ interface HealthData {
 export default function Monitoring() {
   const { data: session } = useSession()
   const [healthData, setHealthData] = useState<HealthData[]>([])
-  const [dataSource, setDataSource] = useState<"manual" | "googleFit">("manual")
   const [isGoogleFitConnected, setIsGoogleFitConnected] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const { toast } = useToast()
 
   useEffect(() => {
     fetchHealthData()
     checkGoogleFitConnection()
-  }, [])
+  }, []) // Removed isGoogleFitConnected from dependencies
 
   const checkGoogleFitConnection = async () => {
     try {
@@ -40,72 +40,92 @@ export default function Monitoring() {
       setIsGoogleFitConnected(data.isConnected)
     } catch (error) {
       console.error("Error checking Google Fit connection:", error)
-    }
-  }
-
-  const fetchHealthData = async () => {
-    try {
-      const response = await fetch("/api/health-data")
-      if (response.ok) {
-        const data = await response.json()
-        setHealthData(data)
-      } else {
-        throw new Error("Failed to fetch health data")
-      }
-    } catch (error) {
-      console.error("Error fetching health data:", error)
       toast({
         title: "Error",
-        description: "Failed to fetch health data",
+        description: "Falha ao verificar o status da conexão do Google Fit",
         variant: "destructive",
       })
     }
   }
 
-  const handleNewData = (newData: HealthData) => {
-    setHealthData([...healthData, newData])
+  const fetchHealthData = async () => {
+    setIsLoading(true)
+    setError(null)
+    try {
+      // Fetch manual data
+      const manualResponse = await fetch("/api/health-data")
+      if (!manualResponse.ok) {
+        throw new Error("Failed to fetch manual health data")
+      }
+      const manualData = await manualResponse.json()
+
+      // Initialize combined data with manual data
+      let combinedData = manualData.data || []
+
+      // Fetch Google Fit data if connected
+      if (isGoogleFitConnected) {
+        const endDate = new Date()
+        const startDate = new Date()
+        startDate.setDate(startDate.getDate() - 30) // Fetch last 30 days of data
+
+        const googleFitResponse = await fetch(
+          `/api/health-data/google-fit?startTime=${startDate.toISOString()}&endTime=${endDate.toISOString()}`,
+        )
+        if (googleFitResponse.ok) {
+          const googleFitResult = await googleFitResponse.json()
+          if (googleFitResult.success && Array.isArray(googleFitResult.data)) {
+            combinedData = [...combinedData, ...googleFitResult.data]
+          } else {
+            console.warn("Unexpected Google Fit data format:", googleFitResult)
+          }
+        } else {
+          console.error("Failed to fetch Google Fit data:", await googleFitResponse.text())
+        }
+      }
+
+      // Sort combined data by date
+      combinedData.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+
+      setHealthData(combinedData)
+    } catch (error) {
+      console.error("Error fetching health data:", error)
+      toast({
+        title: "Error",
+        description: "Falha ao buscar dados de saúde. Por favor, tente novamente.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
+    }
   }
 
-  const handleDataSourceChange = async (source: "manual" | "googleFit") => {
-    setDataSource(source)
-    setError(null)
-
-    if (source === "googleFit" && isGoogleFitConnected) {
-      setIsLoading(true)
-      try {
-        const endTime = new Date()
-        const startTime = new Date(endTime.getTime() - 30 * 24 * 60 * 60 * 1000) // Last 30 days
-
-        const response = await fetch(
-          `/api/health-data/google-fit?startTime=${startTime.toISOString()}&endTime=${endTime.toISOString()}`,
+  const handleNewData = (newData: Partial<HealthData>) => {
+    setHealthData((prevData) => {
+      const existingDataIndex = prevData.findIndex((data) => data.date === newData.date)
+      if (existingDataIndex !== -1) {
+        // Update existing data
+        const updatedData = [...prevData]
+        updatedData[existingDataIndex] = { ...updatedData[existingDataIndex], ...newData } as HealthData
+        return updatedData
+      } else {
+        // Add new data
+        return [...prevData, newData as HealthData].sort(
+          (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
         )
-
-        if (!response.ok) {
-          throw new Error("Failed to fetch Google Fit data")
-        }
-
-        const result = await response.json()
-
-        if (result.success && result.data) {
-          setHealthData(result.data)
-          toast({
-            title: "Sucesso",
-            description: "Dados do Google Fit importados com sucesso",
-          })
-        } else {
-          throw new Error(result.error || "Falha ao importar dados do Google Fit")
-        }
-      } catch (error) {
-        console.error("Error fetching Google Fit data:", error)
-        setError("Falha ao carregar dados do Google Fit. Por favor, tente novamente.")
-        toast({
-          title: "Erro",
-          description: "Falha ao importar dados do Google Fit",
-          variant: "destructive",
-        })
-      } finally {
-        setIsLoading(false)
       }
+    })
+  }
+
+  const handleGoogleFitAuth = async () => {
+    try {
+      window.location.href = "/api/auth/google-fit"
+    } catch (error) {
+      console.error("Error initiating Google Fit auth:", error)
+      toast({
+        title: "Error",
+        description: "Falha ao conectar ao Google Fit",
+        variant: "destructive",
+      })
     }
   }
 
@@ -118,7 +138,11 @@ export default function Monitoring() {
           <CardTitle>Fonte de Dados</CardTitle>
         </CardHeader>
         <CardContent>
-          <DataSourceSelector onSourceChange={handleDataSourceChange} isGoogleFitConnected={isGoogleFitConnected} />
+          <DataSourceSelector
+            onSourceChange={() => {}}
+            onGoogleFitAuth={handleGoogleFitAuth}
+            isGoogleFitConnected={isGoogleFitConnected}
+          />
         </CardContent>
       </Card>
 
@@ -133,7 +157,7 @@ export default function Monitoring() {
         <Card>
           <CardContent className="flex items-center justify-center p-6">
             <Loader2 className="h-6 w-6 animate-spin" />
-            <span className="ml-2">Carregando dados do Google Fit...</span>
+            <span className="ml-2">Carregando dados...</span>
           </CardContent>
         </Card>
       ) : (
@@ -143,16 +167,7 @@ export default function Monitoring() {
               <CardTitle>Adicionar Novos Dados</CardTitle>
             </CardHeader>
             <CardContent>
-              <HealthDataInput
-                onSubmit={handleNewData}
-                disabled={dataSource === "googleFit"}
-                dataSource={{
-                  bloodPressure: dataSource,
-                  heartRate: dataSource,
-                  glucose: "manual",
-                  cholesterol: "manual",
-                }}
-              />
+              <HealthDataInput onSubmit={handleNewData} />
             </CardContent>
           </Card>
 
@@ -185,4 +200,5 @@ export default function Monitoring() {
     </div>
   )
 }
+
 

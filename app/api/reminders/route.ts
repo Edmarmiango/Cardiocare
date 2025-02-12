@@ -3,45 +3,29 @@ import { getServerSession } from "next-auth/next"
 import { authOptions } from '../auth/[...nextauth]/auth-options'
 import prisma from '../../../lib/prisma'
 import { getRemindersForUser } from "../../../lib/reminderService"
-
-export async function GET(request: Request) {
-  const session = await getServerSession(authOptions)
-
-  if (!session || !session.user) {
-    return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
-  }
-
-  const { searchParams } = new URL(request.url)
-  const userId = searchParams.get('userId')
-
-  try {
-    const reminders = await prisma.reminder.findMany({
-      where: {
-        userId: userId || session.user.id,
-        isCompleted: false,
-      },
-      orderBy: {
-        datetime: 'asc',
-      },
-    })
-
-    return NextResponse.json(reminders)
-  } catch (error) {
-    console.error('Error fetching reminders:', error)
-    return NextResponse.json({ error: 'Error fetching reminders' }, { status: 500 })
-  }
-}
+import { createReminderAction } from '../../actions/reminders'
 
 export async function POST(request: Request) {
-  const session = await getServerSession(authOptions)
-
-  if (!session || !session.user || session.user.role !== 'DOCTOR') {
-    return NextResponse.json({ error: 'Not authorized' }, { status: 403 })
-  }
-
   try {
+    const session = await getServerSession(authOptions)
+
+    if (!session?.user?.id) {
+      return NextResponse.json({ success: false, error: "Not authenticated" }, { status: 401 })
+    }
+
     const body = await request.json()
+
+    console.log("Received reminder data:", body)
+
+    if (!body || typeof body !== "object") {
+      return NextResponse.json({ success: false, error: "Invalid request body" }, { status: 400 })
+    }
+
     const { userId, type, title, description, datetime } = body
+
+    if (!userId || !type || !title || !datetime) {
+      return NextResponse.json({ success: false, error: "Missing required fields" }, { status: 400 })
+    }
 
     const reminder = await prisma.reminder.create({
       data: {
@@ -54,10 +38,53 @@ export async function POST(request: Request) {
       },
     })
 
-    return NextResponse.json(reminder)
+    console.log("Created reminder:", reminder)
+
+    return NextResponse.json({ success: true, data: reminder })
   } catch (error) {
-    console.error('Error creating reminder:', error)
-    return NextResponse.json({ error: 'Error creating reminder' }, { status: 500 })
+    console.error("Error creating reminder:", error)
+    return NextResponse.json(
+      {
+        success: false,
+        error: "Failed to create reminder",
+        details: error instanceof Error ? error.message : "Unknown error",
+      },
+      { status: 500 },
+    )
+  }
+}
+
+export async function GET(request: Request) {
+  try {
+    const session = await getServerSession(authOptions)
+
+    if (!session?.user?.id) {
+      return NextResponse.json({ success: false, error: "Not authenticated" }, { status: 401 })
+    }
+
+    const reminders = await prisma.reminder.findMany({
+      where: {
+        userId: session.user.id,
+        datetime: {
+          gte: new Date(),
+        },
+      },
+      orderBy: {
+        datetime: "asc",
+      },
+    })
+
+    return NextResponse.json({ success: true, data: reminders })
+  } catch (error) {
+    console.error("Error fetching reminders:", error)
+    return NextResponse.json(
+      {
+        success: false,
+        error: "Failed to fetch reminders",
+        details: error instanceof Error ? error.message : "Unknown error",
+      },
+      { status: 500 },
+    )
   }
 }
 

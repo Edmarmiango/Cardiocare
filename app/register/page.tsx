@@ -24,6 +24,7 @@ export default function RegisterPage() {
  const [dateOfBirth, setDateOfBirth] = useState('')
  const [gender, setGender] = useState('')
  const [address, setAddress] = useState('')
+ const [phoneNumber, setphoneNumber] = useState("") 
  const [isLoading, setIsLoading] = useState(false)
  const [feedback, setFeedback] = useState<{ type: 'success' | 'error', message: string } | null>(null)
  const [successMessage, setSuccessMessage] = useState<string | null>(null)
@@ -52,6 +53,7 @@ export default function RegisterPage() {
      formData.append('dateOfBirth', dateOfBirth)
      formData.append('gender', gender)
      formData.append('address', address)
+     formData.append("phoneNumber", phoneNumber)
      
      if (userType === 'DOCTOR') {
        formData.append('crm', crm)
@@ -69,29 +71,76 @@ export default function RegisterPage() {
      const data = await response.json()
 
      if (response.ok) {
-       setSuccessMessage(data.message)
-       toast({
-         title: "Registro bem-sucedido",
-         description: data.message,
-       })
-       
-       if (userType === 'PATIENT') {
-         router.push('/login')
-       } else {
-         router.push('/register/confirmation')
-       }
-     } else {
-       throw new Error(data.message || 'Ocorreu um erro durante o registro')
-     }
-   } catch (error) {
-     setFeedback({
-       type: 'error',
-       message: error instanceof Error ? error.message : 'Ocorreu um erro durante o registro'
-     })
-   } finally {
-     setIsLoading(false)
-   }
- }
+      toast({
+        title: "Registro bem-sucedido",
+        description: data.message,
+      })
+
+      // Aguarde um curto período antes de redirecionar
+      setTimeout(() => {
+        if (userType === "PATIENT") {
+          router.push("/login")
+        } else {
+          router.push("/register/confirmation")
+        }
+      }, 1500) // Aguarda 1,5 segundos antes de redirecionar
+    } else {
+      switch (data.code) {
+        case "MISSING_FIELDS":
+          toast({
+            variant: "destructive",
+            title: "Campos obrigatórios faltando",
+            description: data.error,
+          })
+          break
+        case "INVALID_PHONE":
+          toast({
+            variant: "destructive",
+            title: "Número de telefone inválido",
+            description: data.error,
+          })
+          break
+        case "INVALID_BI":
+          toast({
+            variant: "destructive",
+            title: "BI inválido",
+            description: data.error,
+          })
+          break
+        case "INVALID_EMAIL":
+          toast({
+            variant: "destructive",
+            title: "Email inválido",
+            description: data.error,
+          })
+          break
+        case "EMAIL_IN_USE":
+        case "BI_IN_USE":
+        case "PHONE_IN_USE":
+          toast({
+            variant: "destructive",
+            title: "Dados já registrados",
+            description: data.error,
+          })
+          break
+        default:
+          toast({
+            variant: "destructive",
+            title: "Erro no registro",
+            description: data.error || "Ocorreu um erro durante o registro",
+          })
+      }
+    }
+  } catch (error) {
+    toast({
+      variant: "destructive",
+      title: "Erro no registro",
+      description: "Ocorreu um erro durante o registro. Por favor, tente novamente.",
+    })
+  } finally {
+    setIsLoading(false)
+  }
+}
 
  return (
    <div className="min-h-screen py-8 px-4">
@@ -166,6 +215,15 @@ export default function RegisterPage() {
                 id="address" 
                 value={address} 
                 onChange={(e) => setAddress(e.target.value)} 
+                required 
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="phone">Número de Telefone</Label>
+              <Input 
+                id="phone" 
+                type="tel" 
+                value={phoneNumber} onChange={(e) => setphoneNumber(e.target.value)} 
                 required 
               />
             </div>

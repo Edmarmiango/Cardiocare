@@ -182,8 +182,8 @@ export async function PATCH(request: Request) {
   try {
     const session = await getServerSession(authOptions)
 
-    if (!session?.user?.id || session.user.role !== Role.DOCTOR) {
-      return NextResponse.json({ error: "Not authorized" }, { status: 403 })
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Not authenticated" }, { status: 401 })
     }
 
     const body = await request.json()
@@ -193,6 +193,29 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
     }
 
+    // Fetch the prescription to check ownership and current status
+    const prescription = await prisma.prescription.findUnique({
+      where: { id },
+      select: { userId: true, status: true },
+    })
+
+    if (!prescription) {
+      return NextResponse.json({ error: "Prescription not found" }, { status: 404 })
+    }
+
+    // Check if the user is authorized to update the prescription
+    if (session.user.role === Role.PATIENT) {
+      if (prescription.userId !== session.user.id) {
+        return NextResponse.json({ error: "Not authorized to update this prescription" }, { status: 403 })
+      }
+
+      // Patients can only change ACTIVE prescriptions to COMPLETED or ARCHIVED
+      if (prescription.status !== "ACTIVE" || (status !== "COMPLETED" && status !== "ARCHIVED")) {
+        return NextResponse.json({ error: "Invalid status change for patient" }, { status: 400 })
+      }
+    }
+
+    // Update the prescription
     const updatedPrescription = await prisma.prescription.update({
       where: { id },
       data: { status },
@@ -210,4 +233,3 @@ export async function PATCH(request: Request) {
     )
   }
 }
-

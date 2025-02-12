@@ -6,10 +6,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card"
 import { Button } from "../components/ui/button"
 import { Input } from "../components/ui/input"
 import { ScrollArea } from "../components/ui/scroll-area"
-import { toast } from "../components/ui/use-toast"
+import { useToast } from '../components/ui/use-toast'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Paperclip, ImageIcon } from 'lucide-react'
 import Image from 'next/image'
+import { Avatar, AvatarImage, AvatarFallback } from "../components/ui/avatar"
+import { UserAvatar } from "./UserAvatar"
 
 interface Message {
   id: string
@@ -18,6 +20,12 @@ interface Message {
   createdAt: string
   fileUrl?: string
   fileType?: 'image' | 'document'
+}
+
+interface User {
+  id: string
+  name: string
+  profileImage: string
 }
 
 interface ChatProps {
@@ -33,7 +41,9 @@ export function Chat({ otherUserId, otherUserName }: ChatProps) {
   const [file, setFile] = useState<File | null>(null)
   const scrollAreaRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const [otherUser, setOtherUser] = useState<User | null>(null)
   const router = useRouter()
+  const { toast } = useToast()
 
   useEffect(() => {
     const fetchMessages = async () => {
@@ -44,6 +54,7 @@ export function Chat({ otherUserId, otherUserName }: ChatProps) {
         }
         const data = await response.json()
         setMessages(data)
+        setOtherUser(data)
         scrollToBottom()
       } catch (error) {
         console.error('Error fetching messages:', error)
@@ -117,6 +128,12 @@ export function Chat({ otherUserId, otherUserName }: ChatProps) {
     fileInputRef.current?.click()
   }
 
+  if (!otherUser) {
+    return <div>User not found</div>
+  }
+
+  
+
   return (
     <Card className="h-[600px] flex flex-col">
       <CardHeader className="flex flex-row items-center">
@@ -124,6 +141,13 @@ export function Chat({ otherUserId, otherUserName }: ChatProps) {
           <ArrowLeft className="h-4 w-4" />
           <span className="sr-only">Voltar</span>
         </Button>
+        <UserAvatar
+            user={{
+              name: otherUser.name,
+              profileImage: otherUser.profileImage || "",
+            }}
+            className="w-8 h-8 mr-2"
+          />
         <CardTitle>Chat com {otherUserName}</CardTitle>
       </CardHeader>
       <CardContent className="flex-grow flex flex-col">

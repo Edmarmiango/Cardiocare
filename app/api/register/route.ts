@@ -5,6 +5,24 @@ import { sendRegistrationEmail } from '../../../lib/emailService'
 import { writeFile } from 'fs/promises'
 import { join } from 'path'
 
+// Validation functions
+function isValidAngolanPhoneNumber(phoneNumber: string): boolean {
+  // Angolan phone numbers: +244 9xx xxx xxx or 9xx xxx xxx
+  const phoneRegex = /^(\+244|0)?9\d{8}$/
+  return phoneRegex.test(phoneNumber)
+}
+
+function isValidBI(bi: string): boolean {
+  // BI format: 000000000LA000 (9 digits, 2 letters, 3 digits)
+  const biRegex = /^\d{9}[A-Z]{2}\d{3}$/
+  return biRegex.test(bi)
+}
+
+function isValidEmail(email: string): boolean {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+  return emailRegex.test(email)
+}
+
 const prisma = new PrismaClient()
 
 export async function POST(request: Request) {
@@ -18,18 +36,98 @@ export async function POST(request: Request) {
     const gender = formData.get('gender') as string
     const userType = formData.get('userType') as string
     const bi = formData.get('bi') as string
+    const phoneNumber = formData.get("phoneNumber") as string
     const crm = formData.get('crm') as string
     const specialty = formData.get('specialty') as string
     const profileImage = formData.get('profileImage') as File | null
    
+    // Validate required fields
+    const requiredFields = { name, email, password, dateOfBirth, gender, address, phoneNumber, userType, bi }
+    const missingFields = Object.entries(requiredFields)
+      .filter(([_, value]) => !value)
+      .map(([key]) => key)
 
-    // Verifique se o usuário já existe
-    const existingUser = await prisma.user.findUnique({
-      where: { email },
+    if (missingFields.length > 0) {
+      return NextResponse.json(
+        {
+          error: `Missing required fields: ${missingFields.join(", ")}`,
+          code: "MISSING_FIELDS",
+        },
+        { status: 400 },
+      )
+    }
+
+    // Validate phone number
+    if (!isValidAngolanPhoneNumber(phoneNumber)) {
+      return NextResponse.json(
+        {
+          error:
+            "O número de telefone é inválido. Por favor, insira um número de telefone angolano válido (ex: 9xx xxx xxx).",
+          code: "INVALID_PHONE",
+        },
+        { status: 400 },
+      )
+    }
+
+    // Validate BI
+    if (!isValidBI(bi)) {
+      return NextResponse.json(
+        {
+          error:
+            "O formato do BI é inválido. O BI deve conter 9 dígitos, seguidos de 2 letras e 3 dígitos (ex: 000000000LA000).",
+          code: "INVALID_BI",
+        },
+        { status: 400 },
+      )
+    }
+
+    // Validate email
+    if (!isValidEmail(email)) {
+      return NextResponse.json(
+        {
+          error: "O formato do email é inválido. Por favor, insira um endereço de email válido.",
+          code: "INVALID_EMAIL",
+        },
+        { status: 400 },
+      )
+    }
+
+
+    // Check if user already exists
+    const existingUser = await prisma.user.findFirst({
+      where: {
+        OR: [{ email }, { bi }, { phoneNumber }],
+      },
     })
 
     if (existingUser) {
-      return NextResponse.json({ message: 'Usuário já existe' }, { status: 400 })
+      if (existingUser.email === email) {
+        return NextResponse.json(
+          {
+            error: "Este email já está em uso. Por favor, use um email diferente.",
+            code: "EMAIL_IN_USE",
+          },
+          { status: 400 },
+        )
+      }
+      if (existingUser.bi === bi) {
+        return NextResponse.json(
+          {
+            error: "Este BI já está registrado. Se você já tem uma conta, por favor faça login.",
+            code: "BI_IN_USE",
+          },
+          { status: 400 },
+        )
+      }
+      if (existingUser.phoneNumber === phoneNumber) {
+        return NextResponse.json(
+          {
+            error: "Este número de telefone já está em uso. Por favor, use um número diferente.",
+            code: "PHONE_IN_USE",
+          },
+          { status: 400 },
+        )
+      }
     }
 
     // Hash da senha
@@ -62,7 +160,8 @@ export async function POST(request: Request) {
         bi,
         dateOfBirth: new Date(dateOfBirth),
         address,
-        gender
+        gender,
+        phoneNumber
       },
     })
 

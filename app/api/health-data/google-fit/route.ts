@@ -121,12 +121,14 @@ export async function GET(request: Request) {
       heartRateResponse.json(),
     ])
 
-    console.log("Raw Google Fit responses:", {
-      bloodPressure: bloodPressureData,
-      heartRate: heartRateData,
+    console.log("Google Fit API response:", {
+      bloodPressureData,
+      heartRateData,
     })
 
     const processedData = processGoogleFitData(bloodPressureData, heartRateData)
+
+    console.log("Processed data:", processedData)
 
     if (processedData.length === 0) {
       console.log("No data found in Google Fit responses")
@@ -136,6 +138,10 @@ export async function GET(request: Request) {
       success: true,
       data: processedData,
       message: processedData.length === 0 ? "Nenhum dado encontrado no período selecionado" : undefined,
+      debug: {
+        bloodPressureDataLength: bloodPressureData.point?.length || 0,
+        heartRateDataLength: heartRateData.point?.length || 0,
+      },
     })
   } catch (error) {
     console.error("Error fetching Google Fit data:", error)
@@ -167,7 +173,7 @@ function processGoogleFitData(bloodPressureData: any, heartRateData: any) {
           systolic,
           diastolic,
           heartRate: 0,
-          glucose: 0, // Default value since we don't have access
+          glucose: 0,
           cholesterol: 0,
         })
       }
@@ -191,7 +197,7 @@ function processGoogleFitData(bloodPressureData: any, heartRateData: any) {
             systolic: 0,
             diastolic: 0,
             heartRate,
-            glucose: 0, // Default value since we don't have access
+            glucose: 0,
             cholesterol: 0,
           })
         }

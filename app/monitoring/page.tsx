@@ -21,17 +21,18 @@ interface HealthData {
 }
 
 export default function Monitoring() {
-  const { data: session } = useSession()
+  const { data: session, status } = useSession()
   const [healthData, setHealthData] = useState<HealthData[]>([])
   const [isGoogleFitConnected, setIsGoogleFitConnected] = useState(false)
-  const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
   const { toast } = useToast()
 
   useEffect(() => {
-    fetchHealthData()
-    checkGoogleFitConnection()
-  }, []) // Removed isGoogleFitConnected from dependencies
+    if (status === "authenticated") {
+      fetchHealthData()
+      checkGoogleFitConnection()
+    }
+  }, [status])
 
   const checkGoogleFitConnection = async () => {
     try {
@@ -42,7 +43,7 @@ export default function Monitoring() {
       console.error("Error checking Google Fit connection:", error)
       toast({
         title: "Error",
-        description: "Falha ao verificar o status da conexão do Google Fit",
+        description: "Failed to check Google Fit connection status",
         variant: "destructive",
       })
     }
@@ -50,7 +51,6 @@ export default function Monitoring() {
 
   const fetchHealthData = async () => {
     setIsLoading(true)
-    setError(null)
     try {
       // Fetch manual data
       const manualResponse = await fetch("/api/health-data")
@@ -79,7 +79,7 @@ export default function Monitoring() {
             console.warn("Unexpected Google Fit data format:", googleFitResult)
           }
         } else {
-          console.error("Failed to fetch Google Fit data:", await googleFitResponse.text())
+          throw new Error("Failed to fetch Google Fit data")
         }
       }
 
@@ -91,7 +91,7 @@ export default function Monitoring() {
       console.error("Error fetching health data:", error)
       toast({
         title: "Error",
-        description: "Falha ao buscar dados de saúde. Por favor, tente novamente.",
+        description: "Failed to fetch health data. Please try again.",
         variant: "destructive",
       })
     } finally {
@@ -123,7 +123,7 @@ export default function Monitoring() {
       console.error("Error initiating Google Fit auth:", error)
       toast({
         title: "Error",
-        description: "Falha ao conectar ao Google Fit",
+        description: "Failed to connect to Google Fit",
         variant: "destructive",
       })
     }
@@ -139,19 +139,12 @@ export default function Monitoring() {
         </CardHeader>
         <CardContent>
           <DataSourceSelector
-            onSourceChange={() => {}}
+            onSourceChange={fetchHealthData}
             onGoogleFitAuth={handleGoogleFitAuth}
             isGoogleFitConnected={isGoogleFitConnected}
           />
         </CardContent>
       </Card>
-
-      {error && (
-        <Alert variant="destructive">
-          <AlertTitle>Erro</AlertTitle>
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      )}
 
       {isLoading ? (
         <Card>
@@ -179,10 +172,13 @@ export default function Monitoring() {
               {healthData.length > 0 ? (
                 <HealthDataChart data={healthData} />
               ) : (
-                <p className="text-center text-muted-foreground">
-                  Nenhum dado de saúde disponível. Comece adicionando dados manualmente ou conecte sua conta do Google
-                  Fit.
-                </p>
+                <Alert>
+                  <AlertTitle>Nenhum dado disponível</AlertTitle>
+                  <AlertDescription>
+                    Nenhum dado de saúde disponível. Comece adicionando dados manualmente ou conecte sua conta do Google
+                    Fit.
+                  </AlertDescription>
+                </Alert>
               )}
             </CardContent>
           </Card>
@@ -200,5 +196,4 @@ export default function Monitoring() {
     </div>
   )
 }
-
 

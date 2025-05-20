@@ -4,62 +4,76 @@ import { authOptions } from '../auth/[...nextauth]/auth-options'
 import prisma from '../../../lib/prisma'
 
 // GET route handler
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const session = await getServerSession(authOptions)
- 
-    if (!session?.user) {
-      return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
+
+    if (!session?.user?.id || session.user.role !== "DOCTOR") {
+      return NextResponse.json({ error: "Not authorized" }, { status: 403 })
     }
- 
-    if (session.user.role !== 'DOCTOR') {
-      return NextResponse.json({ error: 'Acesso permitido apenas para médicos' }, { status: 403 })
-    }
- 
+
     const sharedData = await prisma.sharedHealthData.findMany({
       where: {
-        doctorId: session.user.id
+        doctorId: session.user.id,
       },
-      select: {
-        id: true,
-        patientId: true,
+      include: {
         patient: {
           select: {
             id: true,
             name: true,
-            healthData: {
-              orderBy: { date: 'desc' },
-              take: 10, // Limit to last 10 entries for each patient
-            }
+          },
+        },
+      },
+    })
+
+    const processedData = await Promise.all(
+      sharedData.map(async (data) => {
+        // Fetch manual health data
+        const manualHealthData = await prisma.healthData.findMany({
+          where: {
+            userId: data.patientId,
+          },
+          orderBy: {
+            date: "asc",
+          },
+        })
+
+        // Parse Google Fit data
+        let googleFitData = []
+        if (data.googleFitData) {
+          try {
+            googleFitData = JSON.parse(data.googleFitData)
+          } catch (error) {
+            console.error("Error parsing Google Fit data:", error)
           }
         }
-      }
-    })
- 
-    const formattedData = sharedData.map(data => ({
-      id: data.id, // Include the SharedHealthData record ID
-      patientId: data.patient.id,
-      patientName: data.patient.name,
-      healthData: data.patient.healthData.map(health => ({
-        date: health.date.toISOString(),
-        systolic: health.systolic,
-        diastolic: health.diastolic,
-        heartRate: health.heartRate,
-        glucose: health.glucose,
-        cholesterol: health.cholesterol
-      }))
-    }))
- 
-    return NextResponse.json(formattedData)
+
+        // Combine and sort all health data
+        const allHealthData = [...manualHealthData, ...googleFitData].sort(
+          (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
+        )
+
+        return {
+          id: data.id,
+          patientId: data.patientId,
+          patientName: data.patient.name,
+          healthData: allHealthData,
+        }
+      }),
+    )
+
+    return NextResponse.json(processedData)
   } catch (error) {
-    console.error('Erro ao buscar dados de saúde compartilhados:', error)
+    console.error("Error fetching shared health data:", error)
     return NextResponse.json(
-      { error: 'Erro ao buscar dados de saúde compartilhados' },
-      { status: 500 }
+      {
+        error: "Error fetching shared health data",
+        details: error instanceof Error ? error.message : "Unknown error",
+      },
+      { status: 500 },
     )
   }
- }
-
+}
 // POST route handler
 export async function POST(request: Request) {
   try {

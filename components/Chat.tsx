@@ -10,7 +10,6 @@ import { useToast } from '../components/ui/use-toast'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Paperclip, ImageIcon } from 'lucide-react'
 import Image from 'next/image'
-import { Avatar, AvatarImage, AvatarFallback } from "../components/ui/avatar"
 import { UserAvatar } from "./UserAvatar"
 
 interface Message {
@@ -25,7 +24,7 @@ interface Message {
 interface User {
   id: string
   name: string
-  profileImage: string
+  profileImage: string | null
 }
 
 interface ChatProps {
@@ -50,14 +49,13 @@ export function Chat({ otherUserId, otherUserName }: ChatProps) {
       try {
         const response = await fetch(`/api/messages?otherUserId=${otherUserId}`)
         if (!response.ok) {
-          throw new Error('Failed to fetch messages')
+          throw new Error("Failed to fetch messages")
         }
         const data = await response.json()
         setMessages(data)
-        setOtherUser(data)
         scrollToBottom()
       } catch (error) {
-        console.error('Error fetching messages:', error)
+        console.error("Error fetching messages:", error)
         toast({
           title: "Error",
           description: "Failed to load messages",
@@ -66,12 +64,31 @@ export function Chat({ otherUserId, otherUserName }: ChatProps) {
       }
     }
 
+    const fetchOtherUser = async () => {
+      try {
+        const response = await fetch(`/api/users/${otherUserId}`)
+        if (!response.ok) {
+          throw new Error("Failed to fetch user data")
+        }
+        const userData = await response.json()
+        setOtherUser(userData)
+      } catch (error) {
+        console.error("Error fetching user data:", error)
+        toast({
+          title: "Error",
+          description: "Failed to load user data",
+          variant: "destructive",
+        })
+      }
+    }
+
     if (session?.user) {
       fetchMessages()
+      fetchOtherUser()
       const interval = setInterval(fetchMessages, 5000) // Poll for new messages every 5 seconds
       return () => clearInterval(interval)
     }
-  }, [session, otherUserId])
+  }, [session, otherUserId, toast])
 
   const scrollToBottom = () => {
     if (scrollAreaRef.current) {
@@ -129,7 +146,7 @@ export function Chat({ otherUserId, otherUserName }: ChatProps) {
   }
 
   if (!otherUser) {
-    return <div>User not found</div>
+    return <div>Loading...</div>
   }
 
   

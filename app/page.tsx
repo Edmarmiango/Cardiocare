@@ -1,3 +1,4 @@
+
 interface Doctor {
   id: string;
   name: string;
@@ -267,6 +268,10 @@ export default async function Home() {
     </div>
   )
 }
+
+
+
+
 
 
 

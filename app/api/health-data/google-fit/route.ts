@@ -82,57 +82,47 @@ export async function GET(request: Request) {
       datasetEnd,
     })
 
-    // Use the Fitness REST API endpoints
-    const bloodPressureResponse = await fetch(
-      `https://www.googleapis.com/fitness/v1/users/me/dataSources/raw:com.google.blood_pressure:com.google.android.apps.fitness:user_input/datasets/${datasetStart}-${datasetEnd}`,
-      {
-        headers: {
-          Authorization: `Bearer ${user.googleFitAccessToken}`,
-          Accept: "application/json",
-        },
-      },
-    )
+    // Fetch data from different endpoints with proper error handling
+    const fetchDataWithErrorHandling = async (dataType: string, endpoint: string) => {
+      try {
+        const response = await fetch(
+          `https://www.googleapis.com/fitness/v1/users/me/dataSources/${endpoint}/datasets/${datasetStart}-${datasetEnd}`,
+          {
+            headers: {
+              Authorization: `Bearer ${user.googleFitAccessToken}`,
+              Accept: "application/json",
+            },
+          },
+        )
 
-    if (!bloodPressureResponse.ok) {
-      const errorText = await bloodPressureResponse.text()
-      console.error("Blood pressure response error:", errorText)
-      throw new Error(`Blood pressure API error: ${bloodPressureResponse.status}`)
+        if (!response.ok) {
+          console.warn(`${dataType} data fetch failed:`, await response.text())
+          return { point: [] } // Return empty data structure on error
+        }
+
+        return response.json()
+      } catch (error) {
+        console.error(`Error fetching ${dataType} data:`, error)
+        return { point: [] } // Return empty data structure on error
+      }
     }
 
-    const heartRateResponse = await fetch(
-      `https://www.googleapis.com/fitness/v1/users/me/dataSources/raw:com.google.heart_rate.bpm:com.google.android.apps.fitness:user_input/datasets/${datasetStart}-${datasetEnd}`,
-      {
-        headers: {
-          Authorization: `Bearer ${user.googleFitAccessToken}`,
-          Accept: "application/json",
-        },
-      },
-    )
-
-    if (!heartRateResponse.ok) {
-      const errorText = await heartRateResponse.text()
-      console.error("Heart rate response error:", errorText)
-      throw new Error(`Heart rate API error: ${heartRateResponse.status}`)
-    }
-
-    // Parse responses
+    // Fetch only blood pressure and heart rate data
     const [bloodPressureData, heartRateData] = await Promise.all([
-      bloodPressureResponse.json(),
-      heartRateResponse.json(),
+      fetchDataWithErrorHandling(
+        "blood pressure",
+        "raw:com.google.blood_pressure:com.google.android.apps.fitness:user_input",
+      ),
+      fetchDataWithErrorHandling(
+        "heart rate",
+        "raw:com.google.heart_rate.bpm:com.google.android.apps.fitness:user_input",
+      ),
     ])
 
-    console.log("Google Fit API response:", {
-      bloodPressureData,
-      heartRateData,
-    })
+    console.log("Blood pressure data points:", bloodPressureData.point?.length || 0)
+    console.log("Heart rate data points:", heartRateData.point?.length || 0)
 
     const processedData = processGoogleFitData(bloodPressureData, heartRateData)
-
-    console.log("Processed data:", processedData)
-
-    if (processedData.length === 0) {
-      console.log("No data found in Google Fit responses")
-    }
 
     return NextResponse.json({
       success: true,
@@ -141,6 +131,10 @@ export async function GET(request: Request) {
       debug: {
         bloodPressureDataLength: bloodPressureData.point?.length || 0,
         heartRateDataLength: heartRateData.point?.length || 0,
+        dataTypes: {
+          bloodPressure: bloodPressureData.point?.length > 0,
+          heartRate: heartRateData.point?.length > 0,
+        },
       },
     })
   } catch (error) {
@@ -168,14 +162,13 @@ function processGoogleFitData(bloodPressureData: any, heartRateData: any) {
       const diastolic = point.value?.[1]?.fpVal || 0
 
       if (systolic > 0 || diastolic > 0) {
-        dataMap.set(date, {
-          date,
-          systolic,
-          diastolic,
-          heartRate: 0,
-          glucose: 0,
-          cholesterol: 0,
-        })
+        if (!dataMap.has(date)) {
+          dataMap.set(date, { date, systolic, diastolic, heartRate: 0, source: "googleFit" })
+        } else {
+          const existingData = dataMap.get(date)
+          existingData.systolic = systolic || existingData.systolic
+          existingData.diastolic = diastolic || existingData.diastolic
+        }
       }
     })
   }
@@ -189,28 +182,27 @@ function processGoogleFitData(bloodPressureData: any, heartRateData: any) {
 
       if (heartRate > 0) {
         if (dataMap.has(date)) {
-          const entry = dataMap.get(date)
-          entry.heartRate = heartRate
+          const existingData = dataMap.get(date)
+          existingData.heartRate = heartRate
         } else {
-          dataMap.set(date, {
-            date,
-            systolic: 0,
-            diastolic: 0,
-            heartRate,
-            glucose: 0,
-            cholesterol: 0,
-          })
+          dataMap.set(date, { date, systolic: 0, diastolic: 0, heartRate, source: "googleFit" })
         }
       }
     })
   }
 
   // Convert Map to array and sort by date
-  const sortedData = Array.from(dataMap.values()).sort(
-    (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
-  )
+  let sortedData = Array.from(dataMap.values()).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
 
   console.log("Processed Google Fit data:", sortedData)
+
+  // Remove null or zero values from each data point
+  sortedData = sortedData.map((item) => {
+    Object.keys(item).forEach((key) => (item[key] === null || item[key] === 0) && delete item[key])
+    return item
+  })
+
+  console.log("Processed Google Fit data after removing null/zero values:", sortedData)
 
   return sortedData
 }

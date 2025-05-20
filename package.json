@@ -59,6 +59,7 @@
     "formidable": "^3.5.2",
     "google-calendar": "^1.3.2",
     "googleapis": "^144.0.0",
+    "jspdf": "^3.0.0",
     "lucide-react": "^0.460.0",
     "next": "^15.1.6",
     "next-auth": "^4.24.10",

@@ -1,5 +1,7 @@
 'use client'
 
+import type React from "react"
+
 import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
 import { Button } from "../../components/ui/button"
@@ -12,6 +14,7 @@ import { useToast } from '../../components/ui/use-toast'
 import { createReminderAction } from '../../app/actions/reminders'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/tabs"
 import { Alert, AlertDescription, AlertTitle } from "../../components/ui/alert"
+import { PrescriptionPrintDownload } from "../../components/PrescriptionPrintDownload"
 
 interface Prescription {
   id: string;
@@ -382,7 +385,17 @@ export default function PrescriptionsPage() {
           <TabsTrigger value="COMPLETED">Concluídas</TabsTrigger>
           <TabsTrigger value="ARCHIVED">Arquivadas</TabsTrigger>
         </TabsList>
-        <TabsContent value="ACTIVE">{isLoading ? <div>Carregando...</div> : renderPrescriptions("ACTIVE")}</TabsContent>
+        <TabsContent value="ACTIVE">{isLoading ? ( 
+          <div>Carregando...</div>
+           ): ( 
+           <> 
+            {renderPrescriptions("ACTIVE")}
+             {session?.user.role === "PATIENT" && prescriptions.some((p) => p.status === "ACTIVE") && 
+             ( <PrescriptionPrintDownload prescriptions={prescriptions.filter((p) => p.status ==="ACTIVE")} />
+             )}
+             </>
+            )}
+        </TabsContent>
         <TabsContent value="COMPLETED">
           {isLoading ? <div>Carregando...</div> : renderPrescriptions("COMPLETED")}
         </TabsContent>

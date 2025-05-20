@@ -1,17 +1,23 @@
+"use client"
+
+import type React from "react"
+
 import { useState } from "react"
 import { Button } from "../components/ui/button"
 import { Input } from "../components/ui/input"
 import { useToast } from "../components/ui/use-toast"
 import { Label } from "../components/ui/label"
 import { Checkbox } from "../components/ui/checkbox"
+import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs"
 
 interface HealthData {
   date: string
-  systolic: number | null
-  diastolic: number | null
-  heartRate: number | null
-  glucose: number | null
-  cholesterol: number | null
+  systolic?: number
+  diastolic?: number
+  heartRate?: number
+  glucose?: number
+  cholesterol?: number
 }
 
 interface HealthDataInputProps {
@@ -25,10 +31,15 @@ export function HealthDataInput({ onSubmit, disabled = false }: HealthDataInputP
     date: new Date().toISOString().split("T")[0],
   })
   const [selectedFields, setSelectedFields] = useState<(keyof HealthData)[]>([])
+  const [isLoading, setIsLoading] = useState(false)
+  const [activeTab, setActiveTab] = useState("bloodPressure")
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
-    setFormData((prev) => ({ ...prev, [name]: name === "date" ? value : value ? Number(value) : null }))
+    setFormData((prev) => ({
+      ...prev,
+      [name]: name === "date" ? value : value ? Number(value) : undefined,
+    }))
   }
 
   const handleCheckboxChange = (field: keyof HealthData) => {
@@ -48,18 +59,22 @@ export function HealthDataInput({ onSubmit, disabled = false }: HealthDataInputP
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    try {
-      // Always include date and only selected fields
-      const dataToSubmit = {
-        date: formData.date,
-      } as Partial<HealthData>
+    setIsLoading(true)
 
-      // Add selected fields, ensuring they're numbers or null
+    try {
+      const dataToSubmit: Partial<HealthData> = { date: formData.date }
       selectedFields.forEach((field) => {
-        if (field !== "date") {
-          dataToSubmit[field] = formData[field] !== undefined ? Number(formData[field]) : null
+        if (field !== "date" && formData[field] !== undefined && formData[field] !== "") {
+          dataToSubmit[field] = Number(formData[field])
         }
       })
+
+      // Verifica se há dados para enviar além da data
+      if (Object.keys(dataToSubmit).length <= 1) {
+        throw new Error("Por favor, preencha pelo menos um campo de dados de saúde")
+      }
+
+      console.log("Submitting data:", dataToSubmit)
 
       const response = await fetch("/api/health-data", {
         method: "POST",
@@ -69,15 +84,18 @@ export function HealthDataInput({ onSubmit, disabled = false }: HealthDataInputP
         body: JSON.stringify(dataToSubmit),
       })
 
-      // Check if response is ok before trying to parse JSON
-      if (!response.ok) {
-        const errorText = await response.text()
-        throw new Error(errorText || "Falha ao registrar dados de saúde")
+      const responseText = await response.text()
+      console.log("Raw response:", responseText)
+
+      let result
+      try {
+        result = JSON.parse(responseText)
+      } catch (parseError) {
+        console.error("Error parsing response:", responseText)
+        throw new Error("Invalid response from server")
       }
 
-      const result = await response.json()
-
-      if (result.success) {
+      if (response.ok) {
         onSubmit(result.data)
         toast({
           title: "Sucesso",
@@ -96,31 +114,23 @@ export function HealthDataInput({ onSubmit, disabled = false }: HealthDataInputP
         description: error instanceof Error ? error.message : "Falha ao registrar dados de saúde",
         variant: "destructive",
       })
+    } finally {
+      setIsLoading(false)
     }
   }
 
-  const fields: { key: keyof HealthData; label: string }[] = [
+  const bloodPressureFields: { key: keyof HealthData; label: string }[] = [
     { key: "systolic", label: "Pressão Sistólica" },
     { key: "diastolic", label: "Pressão Diastólica" },
     { key: "heartRate", label: "Frequência Cardíaca" },
-    { key: "glucose", label: "Glicose" },
-    { key: "cholesterol", label: "Colesterol" },
   ]
 
-  return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div>
-        <Label htmlFor="date">Data</Label>
-        <Input
-          type="date"
-          id="date"
-          name="date"
-          value={formData.date}
-          onChange={handleChange}
-          required
-          disabled={disabled}
-        />
-      </div>
+  const glucoseFields: { key: keyof HealthData; label: string }[] = [{ key: "glucose", label: "Glicose" }]
+
+  const cholesterolFields: { key: keyof HealthData; label: string }[] = [{ key: "cholesterol", label: "Colesterol" }]
+
+  const renderFields = (fields: { key: keyof HealthData; label: string }[]) => (
+    <>
       {fields.map((field) => (
         <div key={field.key} className="flex items-center space-x-2">
           <Checkbox
@@ -141,10 +151,44 @@ export function HealthDataInput({ onSubmit, disabled = false }: HealthDataInputP
           </div>
         </div>
       ))}
-      <Button type="submit" disabled={disabled || selectedFields.length === 0}>
-        Registrar Dados
-      </Button>
-    </form>
+    </>
+  )
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Adicionar Novos Dados</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <Label htmlFor="date">Data</Label>
+            <Input
+              type="date"
+              id="date"
+              name="date"
+              value={formData.date}
+              onChange={handleChange}
+              required
+              disabled={disabled}
+            />
+          </div>
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
+            <TabsList>
+              <TabsTrigger value="bloodPressure">Pressão Arterial</TabsTrigger>
+              <TabsTrigger value="glucose">Glicose</TabsTrigger>
+              <TabsTrigger value="cholesterol">Colesterol</TabsTrigger>
+            </TabsList>
+            <TabsContent value="bloodPressure">{renderFields(bloodPressureFields)}</TabsContent>
+            <TabsContent value="glucose">{renderFields(glucoseFields)}</TabsContent>
+            <TabsContent value="cholesterol">{renderFields(cholesterolFields)}</TabsContent>
+          </Tabs>
+          <Button type="submit" disabled={disabled || isLoading || selectedFields.length === 0}>
+            {isLoading ? "Enviando..." : "Registrar Dados"}
+          </Button>
+        </form>
+      </CardContent>
+    </Card>
   )
 }
 

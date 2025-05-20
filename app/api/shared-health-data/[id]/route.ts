@@ -1,66 +1,109 @@
-import { NextResponse } from 'next/server'
+import { NextResponse } from "next/server"
 import { getServerSession } from "next-auth/next"
-import { authOptions } from '../../auth/[...nextauth]/auth-options';
-import prisma from '../../../../lib/prisma';
+import { authOptions } from "../../auth/[...nextauth]/auth-options"
+import prisma from "../../../../lib/prisma"
 
-export async function DELETE(
-  request: Request,
-  { params }: { params: { id: string } }
-) {
+export async function GET(request: Request, { params }: { params: { id: string } }) {
   try {
-    const session = await getServerSession(authOptions);
+    const session = await getServerSession(authOptions)
 
-    if (!session?.user) {
-      return NextResponse.json(
-        { error: 'Não autenticado' },
-        { status: 401 }
-      );
+    if (!session?.user?.id || session.user.role !== "DOCTOR") {
+      return NextResponse.json({ error: "Not authorized" }, { status: 403 })
     }
 
-    if (session.user.role !== 'DOCTOR') {
-      return NextResponse.json(
-        { error: 'Acesso permitido apenas para médicos' },
-        { status: 403 }
-      );
+    const { id } = params
+
+    const sharedData = await prisma.sharedHealthData.findUnique({
+      where: { id },
+      include: {
+        patient: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+      },
+    })
+
+    if (!sharedData) {
+      return NextResponse.json({ error: "Shared data not found" }, { status: 404 })
     }
 
-    const sharedDataId = params.id;
-
-    if (!sharedDataId) {
-      return NextResponse.json(
-        { error: 'ID de compartilhamento não fornecido' },
-        { status: 400 }
-      );
-    }
-
-    const deletedShare = await prisma.sharedHealthData.delete({
+    // Fetch manual health data
+    const manualHealthData = await prisma.healthData.findMany({
       where: {
-        id: sharedDataId,
-        doctorId: session.user.id
+        userId: sharedData.patientId,
+      },
+      orderBy: {
+        date: "asc",
+      },
+    })
+
+    // Parse Google Fit data if available
+    let googleFitData = []
+    if (sharedData.googleFitData) {
+      try {
+        googleFitData = JSON.parse(sharedData.googleFitData)
+      } catch (error) {
+        console.error("Error parsing Google Fit data:", error)
       }
-    });
-
-    if (!deletedShare) {
-      return NextResponse.json(
-        { error: 'Dados compartilhados não encontrados ou você não tem permissão para removê-los' },
-        { status: 404 }
-      );
     }
 
-    return NextResponse.json({ message: 'Compartilhamento de dados removido com sucesso' });
+    // Combine and sort all health data
+    const allHealthData = [...manualHealthData, ...googleFitData].sort(
+      (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
+    )
+
+    return NextResponse.json({
+      patient: sharedData.patient,
+      healthData: allHealthData,
+    })
   } catch (error) {
-    console.error('Error removing shared health data:', error);
-    if (error instanceof Error) {
-      return NextResponse.json(
-        { error: 'Erro ao remover dados compartilhados', details: error.message },
-        { status: 500 }
-      );
-    }
+    console.error("Error fetching shared health data:", error)
     return NextResponse.json(
-      { error: 'Erro interno do servidor' },
-      { status: 500 }
-    );
+      {
+        error: "Error fetching shared health data",
+        details: error instanceof Error ? error.message : "Unknown error",
+      },
+      { status: 500 },
+    )
   }
 }
 
+export async function DELETE(request: Request, { params }: { params: { id: string } }) {
+  try {
+    const session = await getServerSession(authOptions)
+
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Not authenticated" }, { status: 401 })
+    }
+
+    const { id } = params
+
+    const share = await prisma.sharedHealthData.findUnique({
+      where: { id },
+    })
+
+    if (!share) {
+      return NextResponse.json({ error: "Share not found" }, { status: 404 })
+    }
+
+    if (share.patientId !== session.user.id && share.doctorId !== session.user.id) {
+      return NextResponse.json({ error: "Not authorized to remove this share" }, { status: 403 })
+    }
+
+    await prisma.sharedHealthData.delete({
+      where: { id },
+    })
+
+    return NextResponse.json({
+      success: true,
+      message: "Health data share removed successfully",
+    })
+  } catch (error) {
+    console.error("Error removing health data share:", error)
+    return NextResponse.json({ error: "Error removing health data share" }, { status: 500 })
+  }
+}
 

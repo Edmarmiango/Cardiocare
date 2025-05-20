@@ -53,8 +53,15 @@ export const authOptions: NextAuthOptions = {
           prompt: "consent",
           access_type: "offline",
           response_type: "code",
-          scope:
-            "openid email profile https://www.googleapis.com/auth/fitness.activity.read https://www.googleapis.com/auth/fitness.blood_pressure.read https://www.googleapis.com/auth/fitness.heart_rate.read",
+          scope: [
+            "openid",
+            "email",
+            "profile",
+            "https://www.googleapis.com/auth/fitness.activity.read",
+            "https://www.googleapis.com/auth/fitness.blood_pressure.read",
+            "https://www.googleapis.com/auth/fitness.heart_rate.read",
+            "https://www.googleapis.com/auth/fitness.blood_glucose.read",
+          ].join(" "),
         },
       },
     }),

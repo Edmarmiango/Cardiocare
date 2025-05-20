@@ -31,4 +31,3 @@ export const config = {
     '/prediction/:path*',
   ],
 }
-

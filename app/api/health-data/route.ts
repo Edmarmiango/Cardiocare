@@ -1,132 +1,98 @@
-import { NextResponse } from "next/server"
-import { getServerSession } from "next-auth/next"
-import { authOptions } from "../auth/[...nextauth]/auth-options"
-import prisma from "../../../lib/prisma"
+import { NextResponse } from "next/server";
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "../auth/[...nextauth]/auth-options";
+import prisma from "../../../lib/prisma";
+
+interface HealthDataInput {
+  date: string;
+  systolic?: number;
+  diastolic?: number;
+  heartRate?: number;
+  glucose?: number;
+  cholesterol?: number;
+}
 
 export async function POST(request: Request) {
   try {
-    const session = await getServerSession(authOptions)
+    const session = await getServerSession(authOptions);
 
     if (!session?.user?.id) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Not authenticated",
-        },
-        {
-          status: 401,
-        },
-      )
+      return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
     }
 
-    const body = await request.json()
+    const body: HealthDataInput | null = await request.json().catch(() => null);
 
     if (!body || typeof body !== "object") {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Invalid request body format",
-        },
-        {
-          status: 400,
-        },
-      )
+      return NextResponse.json({ error: "Corpo da requisição inválido" }, { status: 400 });
     }
 
-    const { date, systolic, diastolic, heartRate, glucose, cholesterol } = body
-
-    if (!date) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Date is required",
-        },
-        {
-          status: 400,
-        },
-      )
+    if (!body.date) {
+      return NextResponse.json({ error: "A data é obrigatória" }, { status: 400 });
     }
 
-    // Prepare data object with only defined fields
-    const data: any = {
-      userId: session.user.id,
-      date: new Date(date),
+    const hasHealthData = Object.entries(body)
+      .filter(([key]) => key !== "date")
+      .some(([, value]) => value !== null && value !== undefined);
+
+    if (!hasHealthData) {
+      return NextResponse.json({ error: "Pelo menos um dado de saúde é obrigatório" }, { status: 400 });
     }
 
-    // Only include fields that were sent in the request
-    if ("systolic" in body) data.systolic = systolic === null ? null : Number(systolic)
-    if ("diastolic" in body) data.diastolic = diastolic === null ? null : Number(diastolic)
-    if ("heartRate" in body) data.heartRate = heartRate === null ? null : Number(heartRate)
-    if ("glucose" in body) data.glucose = glucose === null ? null : Number(glucose)
-    if ("cholesterol" in body) data.cholesterol = cholesterol === null ? null : Number(cholesterol)
-
-    // Create the health data entry
     const healthData = await prisma.healthData.create({
-      data,
-    })
+      data: {
+        userId: session.user.id,
+        date: new Date(body.date),
+        systolic: body.systolic ?? null,
+        diastolic: body.diastolic ?? null,
+        heartRate: body.heartRate ?? null,
+        glucose: body.glucose ?? null,
+        cholesterol: body.cholesterol ?? null,
+      },
+    });
 
-    return NextResponse.json({
-      success: true,
-      data: healthData,
-    })
+    const responseData = Object.fromEntries(
+      Object.entries(healthData).filter(([, value]) => value !== null)
+    );
+
+    return NextResponse.json({ success: true, data: responseData });
   } catch (error) {
-    console.error("Error creating health data:", error)
-
-    return NextResponse.json(
-      {
-        success: false,
-        error: "Error creating health data",
-        details: error instanceof Error ? error.message : "Unknown error",
-      },
-      {
-        status: 500,
-      },
-    )
+    console.error("🔥 Erro ao criar dados de saúde:", error);
+    return NextResponse.json({ error: "Erro interno do servidor" }, { status: 500 });
   }
 }
 
 export async function GET(request: Request) {
   try {
-    const session = await getServerSession(authOptions)
+    const session = await getServerSession(authOptions);
 
     if (!session?.user?.id) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Not authenticated",
-        },
-        {
-          status: 401,
-        },
-      )
+      return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
+    }
+
+    const { searchParams } = new URL(request.url);
+    const startDate = searchParams.get("startDate");
+    const endDate = searchParams.get("endDate");
+
+    let dateFilter = {};
+    if (startDate && endDate) {
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
+        dateFilter = { date: { gte: start, lte: end } };
+      }
     }
 
     const healthData = await prisma.healthData.findMany({
       where: {
         userId: session.user.id,
+        ...dateFilter,
       },
-      orderBy: {
-        date: "desc",
-      },
-    })
+      orderBy: { date: "asc" },
+    });
 
-    return NextResponse.json({
-      success: true,
-      data: healthData,
-    })
+    return NextResponse.json({ success: true, data: healthData });
   } catch (error) {
-    console.error("Error fetching health data:", error)
-
-    return NextResponse.json(
-      {
-        success: false,
-        error: "Error fetching health data",
-        details: error instanceof Error ? error.message : "Unknown error",
-      },
-      {
-        status: 500,
-      },
-    )
+    console.error("🔥 Erro ao buscar dados de saúde:", error);
+    return NextResponse.json({ error: "Erro interno do servidor" }, { status: 500 });
   }
 }
-

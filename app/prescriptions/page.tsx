@@ -15,6 +15,7 @@ import { createReminderAction } from '../../app/actions/reminders'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/tabs"
 import { Alert, AlertDescription, AlertTitle } from "../../components/ui/alert"
 import { PrescriptionPrintDownload } from "../../components/PrescriptionPrintDownload"
+import { PatientAutocomplete } from "../../components/PatientAutocomplete"
 
 interface Prescription {
   id: string;
@@ -58,37 +59,96 @@ export default function PrescriptionsPage() {
   const [activeTab, setActiveTab] = useState('ACTIVE')
   const [error, setError] = useState<string | null>(null)
   const { toast } = useToast()
+  const [currentPage, setCurrentPage] = useState(1);
+  const prescriptionsPerPage = 9;
+  const [searchTerm, setSearchTerm] = useState("")
+  const [search, setSearch] = useState("")
+  const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null)
 
-  useEffect(() => {
+
+ useEffect(() => {
     if (status === 'authenticated') {
       fetchPrescriptions(activeTab)
+      setCurrentPage(1); // Resetar para página 1 ao trocar o status
       if (session?.user.role === 'DOCTOR') {
         fetchPatients()
+        setCurrentPage(1); // Resetar para página 1 ao trocar o status
       }
     }
   }, [status, session, activeTab])
 
-  const fetchPrescriptions = async (status: string) => {
+
+  const updatePrescriptionStatus = async (id: string, newStatus: 'ACTIVE' | 'COMPLETED' | 'ARCHIVED') => {
     try {
-      const response = await fetch(`/api/prescriptions?status=${status}`)
-      if (response.ok) {
-        const data = await response.json()
-        setPrescriptions(data)
-      } else {
-        const errorData = await response.json()
-        throw new Error(errorData.error || "Failed to fetch prescriptions")
+      const res = await fetch('/api/prescriptions', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ id, status: newStatus }),
+      });
+
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || 'Erro ao atualizar prescrição');
       }
-    } catch (error) {
-      console.error("Error fetching prescriptions:", error)
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to fetch prescriptions",
-        variant: "destructive",
-      })
-    } finally {
-      setIsLoading(false)
+
+      return await res.json();
+    } catch (err) {
+      console.error(`Erro ao atualizar status da prescrição ${id}:`, err);
+      return null;
     }
+  };
+
+
+ const fetchPrescriptions = async (status: string) => {
+  try {
+    const response = await fetch(`/api/prescriptions?status=${status}`);
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || "Failed to fetch prescriptions");
+    }
+
+    let data = await response.json();
+
+    // ✅ Só verifica vencidas se for status 'ACTIVE'
+    if (status === 'ACTIVE') {
+      const today = new Date();
+
+      const updated = await Promise.all(
+        data.map(async (prescription: Prescription) => {
+          const isExpired =
+            prescription.status === 'ACTIVE' &&
+            prescription.endDate &&
+            new Date(prescription.endDate) < today;
+
+          if (isExpired) {
+            const updated = await updatePrescriptionStatus(prescription.id, 'COMPLETED');
+            return updated ?? prescription;
+          }
+
+          return prescription;
+        })
+      );
+
+      data = updated;
+    }
+
+    setPrescriptions(data);
+  } catch (error) {
+    console.error("Error fetching prescriptions:", error);
+    toast({
+      title: "Error",
+      description:
+        error instanceof Error
+          ? error.message
+          : "Failed to fetch prescriptions",
+      variant: "destructive",
+    });
+  } finally {
+    setIsLoading(false);
   }
+};
 
   const fetchPatients = async () => {
     try {
@@ -312,16 +372,35 @@ export default function PrescriptionsPage() {
     }
   }
 
-  const renderPrescriptions = (status: 'ACTIVE' | 'COMPLETED' | 'ARCHIVED') => {
-    const filteredPrescriptions = prescriptions.filter(p => p.status === status);
-    return filteredPrescriptions.length > 0 ? (
+ const renderPrescriptions = (status: 'ACTIVE' | 'COMPLETED' | 'ARCHIVED') => {
+  let filteredPrescriptions = prescriptions.filter(p => p.status === status);
+
+   // Aplica filtro de pesquisa para médicos
+  if (session?.user.role === 'DOCTOR' && searchTerm.trim() !== '') {
+    const lowerSearch = searchTerm.toLowerCase();
+    filteredPrescriptions = filteredPrescriptions.filter(prescription =>
+      prescription.user.name.toLowerCase().includes(lowerSearch) ||
+      prescription.medication.toLowerCase().includes(lowerSearch)
+    );
+  }
+
+  // Paginação
+  const indexOfLast = currentPage * prescriptionsPerPage;
+  const indexOfFirst = indexOfLast - prescriptionsPerPage;
+  const currentPrescriptions = filteredPrescriptions.slice(indexOfFirst, indexOfLast);
+
+  const totalPages = Math.ceil(filteredPrescriptions.length / prescriptionsPerPage);
+
+  return filteredPrescriptions.length > 0 ? (
+    <div className="space-y-4">
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {filteredPrescriptions.map((prescription) => (
-          <Card key={prescription.id}>
+        {currentPrescriptions.map((prescription) => (
+          <Card key={prescription.id} className="shadow-sm rounded-2xl border border-border border-primary/40 rounded-lg">
             <CardHeader>
               <CardTitle>{prescription.medication}</CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-2 text-sm text-black">
+              {/* Conteúdo do card... */}
               <p><strong>Dosagem:</strong> {prescription.dosage}</p>
               <p><strong>Frequência:</strong> {prescription.frequency}</p>
               <p><strong>Instruções:</strong> {prescription.instructions}</p>
@@ -330,47 +409,73 @@ export default function PrescriptionsPage() {
                 <p><strong>Data de término:</strong> {new Date(prescription.endDate).toLocaleDateString()}</p>
               )}
               {session?.user.role === 'PATIENT' && prescription.doctor && (
-                <p><strong>Prescrito por:</strong> Dr(a). {prescription.doctor.name} ({prescription.doctor.specialty})</p>
+                <p className="font-semibold text-primary"><strong>Prescrito por:</strong> Dr(a). {prescription.doctor.name} ({prescription.doctor.specialty})</p>
               )}
               {session?.user.role === 'DOCTOR' && prescription.user && (
                 <p><strong>Paciente:</strong> {prescription.user.name}</p>
               )}
-       
-                <div className="mt-4">
+
+              {session?.user.role === 'DOCTOR' && (
+                <div>
+                  <Label>Status</Label>
                   <Select
                     value={prescription.status}
-                    onValueChange={(value) => handleStatusChange(prescription.id, value as 'ACTIVE' | 'COMPLETED' | 'ARCHIVED')}
+                    onValueChange={(newStatus) => handleStatusChange(prescription.id, newStatus as 'ACTIVE' | 'COMPLETED' | 'ARCHIVED')}
                   >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Change status" />
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Status" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="ACTIVE">Activo</SelectItem>
-                      <SelectItem value="COMPLETED">Concluído</SelectItem>
-                      <SelectItem value="ARCHIVED">Arquivado</SelectItem>
+                      <SelectItem value="ACTIVE">Activa</SelectItem>
+                      <SelectItem value="COMPLETED">Concluída</SelectItem>
+                      <SelectItem value="ARCHIVED">Arquivada</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
-              
+              )}
             </CardContent>
           </Card>
         ))}
       </div>
-    ) : (
-      <p>Nenhuma prescrição {status.toLowerCase()} encontrada.</p>
-    );
-  };
+
+      {/* Controles de paginação */}
+      {totalPages > 1 && (
+        <div className="flex justify-center items-center gap-4 mt-4">
+          <Button
+            variant="outline"
+            disabled={currentPage === 1}
+            onClick={() => setCurrentPage((prev) => prev - 1)}
+          >
+            Anterior
+          </Button>
+          <span>Página {currentPage} de {totalPages}</span>
+          <Button
+            variant="outline"
+            disabled={currentPage === totalPages}
+            onClick={() => setCurrentPage((prev) => prev + 1)}
+          >
+            Próxima
+          </Button>
+        </div>
+      )}
+    </div>
+  ) : (
+    <p>Nenhuma prescrição {status.toLowerCase()} encontrada.</p>
+  );
+};
+
 
   if (status === "loading") {
     return <div>Loading...</div>
   }
 
   if (!session) {
-    return <div>Please log in to view prescriptions.</div>
+    return <div>Por favor faça login para ver as prescrições.</div>
   }
 
+
   return (
-    <div className="container mx-auto p-4">
+    <div className="container mx-auto p-4 bg-gradient-to-br from-white to-blue-50">
       {error && (
         <Alert variant="destructive" className="mb-4">
           <AlertTitle>Error</AlertTitle>
@@ -378,10 +483,22 @@ export default function PrescriptionsPage() {
         </Alert>
       )}
       <h1 className="text-2xl font-bold mb-4">Prescrições</h1>
+      {session?.user.role === 'DOCTOR' && (
+        <div className="mb-4">
+          <Input
+            type="text"
+            placeholder="Pesquisar por paciente ou medicamento..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full md:w-1/2"
+          />
+        </div>
+      )}
+
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
-          <TabsTrigger value="ACTIVE">Ativas</TabsTrigger>
+          <TabsTrigger value="ACTIVE">Activas ({prescriptions.filter(p => p.status === "ACTIVE").length})</TabsTrigger>
           <TabsTrigger value="COMPLETED">Concluídas</TabsTrigger>
           <TabsTrigger value="ARCHIVED">Arquivadas</TabsTrigger>
         </TabsList>
@@ -389,10 +506,19 @@ export default function PrescriptionsPage() {
           <div>Carregando...</div>
            ): ( 
            <> 
-            {renderPrescriptions("ACTIVE")}
-             {session?.user.role === "PATIENT" && prescriptions.some((p) => p.status === "ACTIVE") && 
-             ( <PrescriptionPrintDownload prescriptions={prescriptions.filter((p) => p.status ==="ACTIVE")} />
-             )}
+            <div className="space-y-4">
+              {renderPrescriptions("ACTIVE")}
+              {session?.user.role === "PATIENT" &&
+                prescriptions.some((p) => p.status === "ACTIVE") && (
+                  <div className="mt-6">
+                    <PrescriptionPrintDownload
+                      prescriptions={prescriptions.filter(
+                        (p) => p.status === "ACTIVE"
+                      )}
+                    />
+                  </div>
+                )}
+            </div>
              </>
             )}
         </TabsContent>
@@ -412,20 +538,16 @@ export default function PrescriptionsPage() {
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <Label htmlFor="patientId">Paciente</Label>
-                <Select
-                  value={newPrescription.patientId}
-                  onValueChange={(value) => setNewPrescription({...newPrescription, patientId: value})}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione o paciente" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {patients.map((patient) => (
-                      <SelectItem key={patient.id} value={patient.id}>{patient.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Label>Paciente</Label>
+                <PatientAutocomplete
+                  value={selectedPatient || undefined}
+                  onSelect={(patient) => {
+                    console.log("Paciente selecionado:", patient)
+                    setSelectedPatient(patient)
+                    setNewPrescription((prev) => ({ ...prev, patientId: patient.id }))
+                  }}
+                />
+
               </div>
               <div>
                 <Label htmlFor="medication">Medicamento</Label>

@@ -11,18 +11,27 @@ export async function GET(request: Request) {
   }
 
   try {
+    const { searchParams } = new URL(request.url)
+    const query = searchParams.get("q")?.toLowerCase() || ""
+
     const patients = await prisma.user.findMany({
       where: {
-        role: 'PATIENT'
+        role: 'PATIENT',
+        name: {
+          contains: query,
+          mode: 'insensitive', // ignora maiúsculas/minúsculas
+        }
       },
       select: {
         id: true,
         name: true,
-        profileImage: true
+        profileImage: true,
+        bi: true
       },
       orderBy: {
-        name: 'asc'
-      }
+        name: 'asc',
+      },
+      take: 10, // limita o número de resultados
     })
 
     return NextResponse.json(patients)
@@ -31,4 +40,3 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Error fetching patients' }, { status: 500 })
   }
 }
-

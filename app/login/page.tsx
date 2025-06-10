@@ -10,6 +10,7 @@ import { Label } from "../../components/ui/label"
 import { Alert, AlertTitle, AlertDescription } from "../../components/ui/alert"
 import { EyeIcon, EyeOffIcon } from "lucide-react"
 import { useToast } from '../../components/ui/use-toast'
+import Image from "next/image";
 
 
 export default function Login() {
@@ -62,14 +63,20 @@ export default function Login() {
 }
 
  return (
-   <div className="container mx-auto flex h-screen items-center justify-center">
-     <Card className="w-full max-w-md">
-       <CardHeader>
-         <CardTitle>Login</CardTitle>
-         <CardDescription>Entre com suas credenciais para acessar o sistema.</CardDescription>
-       </CardHeader>
-       <CardContent>
-         <form onSubmit={handleSubmit} className="space-y-4">
+   <div className="flex min-h-screen">
+    {/* Lado Esquerdo: Formulário de Login */}
+      <div className="w-1/2 flex items-center justify-center p-16 bg-white">
+         
+
+         <form onSubmit={handleSubmit} className="w-full max-w-xl space-y-6">
+
+          {/* Título e Descrição */}
+          <div className="space-y-2 text-center">
+            <h1 className="text-3xl font-bold text-primary">Login</h1>
+            <p className="text-gray-600">Entre com suas credenciais para acessar o sistema.</p>
+          </div>
+
+
            <div className="space-y-2">
              <Label htmlFor="email">Email</Label>
              <Input
@@ -79,6 +86,7 @@ export default function Login() {
                value={email}
                onChange={(e) => setEmail(e.target.value)}
                required
+               className="w-full px-4 py-2 border border-primary/40 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition"
                disabled={isLoading}
              />
            </div>
@@ -92,18 +100,24 @@ export default function Login() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
+                  className="w-full px-4 py-2 border border-primary/40 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition"
                 />
                 <button
                   type="button"
                   onClick={togglePasswordVisibility}
-                  className="absolute inset-y-0 right-0 flex items-center pr-3"
+                  className="absolute right-3 top-[15px] text-gray-500 hover:text-primary"
                 >
                   {showPassword ? (
-                    <EyeOffIcon className="h-4 w-4 text-gray-400" />
+                    <EyeOffIcon className="h-4 w-4 text-blue-400" />
                   ) : (
-                    <EyeIcon className="h-4 w-4 text-gray-400" />
+                    <EyeIcon className="h-4 w-4 text-blue-400" />
                   )}
                 </button>
+                <div className="text-center mt-3">
+                  <a href="/esqueci-senha" className="text-sm text-primary hover:underline">
+                    Esqueceu a senha?
+                  </a>
+                </div>
               </div>
             </div>
            {error && (
@@ -115,9 +129,26 @@ export default function Login() {
            <Button type="submit" className="w-full" disabled={isLoading}>
              {isLoading ? "Entrando..." : "Entrar"}
            </Button>
+           {/* Link Criar Conta */}
+          <div className="text-center text-sm text-muted-foreground">
+            Não tem uma conta?{" "}
+            <a href="/register" className="text-primary hover:underline">
+              Criar uma conta
+            </a>
+          </div>
          </form>
-       </CardContent>
-     </Card>
+
+   </div>
+   {/* Lado Direito: SVG */}
+    <div className="w-1/2 bg-blue-50 flex items-center justify-center">
+      <Image
+        src="/images/undraw_mobile-log-in_0n4q.svg" // coloque na pasta public/images
+        alt="Ilustração Login"
+        width={500}
+        height={500}
+        className="w-3/4 h-auto"
+      />
+    </div>
    </div>
  )
 }

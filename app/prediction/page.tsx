@@ -84,11 +84,33 @@ export default function Prediction() {
     }
   }
 
+  {/* Função auxiliar opcional (pode ser fora do componente): */}
+const getRiskColor = (category: string) => {
+  switch (category) {
+    case 'Muito alto':
+      return 'text-red-600';
+    case 'Alto':
+      return 'text-orange-500';
+    case 'Moderado':
+      return 'text-yellow-500';
+    case 'Baixo':
+      return 'text-green-600';
+    case 'Muito baixo':
+      return 'text-emerald-500'; // verde mais suave
+    default:
+      return 'text-gray-700';
+  }
+};
+
   return (
-    <Card className="max-w-2xl mx-auto">
-      <CardHeader>
-        <CardTitle>Predição de Risco Cardiovascular</CardTitle>
-      </CardHeader>
+    <div className="min-h-screen bg-gradient-to-br from-white to-blue-50 py-12 px-4">
+      <div className="max-w-4xl mx-auto">
+        <h1 className="text-3xl font-bold text-center text-primary mb-2">Predição de Risco Cardiovascular</h1>
+        <p className="text-center text-gray-600 mb-8">
+          Preencha o formulário abaixo com seus dados de saúde para obter uma avaliação de risco.
+        </p>
+
+    <Card className="bg-white border border-primary/20 rounded-2xl shadow-lg p-6">                                                                                                                                                                                                            
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
@@ -99,6 +121,7 @@ export default function Prediction() {
               required 
               value={formData.age_years} 
               onChange={(e) => handleChange('age_years', parseInt(e.target.value))} 
+              className="w-full px-4 py-2 border border-primary/40 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition"
             />
           </div>
           <div>
@@ -124,6 +147,7 @@ export default function Prediction() {
               required 
               value={formData.height} 
               onChange={(e) => handleChange('height', parseInt(e.target.value))} 
+              className="w-full px-4 py-2 border border-primary/40 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition"
             />
           </div>
           <div>
@@ -134,6 +158,7 @@ export default function Prediction() {
               required 
               value={formData.weight} 
               onChange={(e) => handleChange('weight', parseInt(e.target.value))} 
+              className="w-full px-4 py-2 border border-primary/40 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition"
             />
           </div>
           <div>
@@ -144,6 +169,7 @@ export default function Prediction() {
               required 
               value={formData.ap_hi} 
               onChange={(e) => handleChange('ap_hi', parseInt(e.target.value))} 
+              className="w-full px-4 py-2 border border-primary/40 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition"
             />
           </div>
           <div>
@@ -154,6 +180,7 @@ export default function Prediction() {
               required 
               value={formData.ap_lo} 
               onChange={(e) => handleChange('ap_lo', parseInt(e.target.value))} 
+              className="w-full px-4 py-2 border border-primary/40 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition"
             />
           </div>
           <div>
@@ -164,6 +191,7 @@ export default function Prediction() {
               required 
               value={formData.cholesterol} 
               onChange={(e) => handleChange('cholesterol', parseInt(e.target.value))} 
+              className="w-full px-4 py-2 border border-primary/40 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition"
             />
           </div>
           <div>
@@ -174,6 +202,7 @@ export default function Prediction() {
               required 
               value={formData.gluc} 
               onChange={(e) => handleChange('gluc', parseInt(e.target.value))} 
+              className="w-full px-4 py-2 border border-primary/40 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition"
             />
           </div>
           <div>
@@ -224,17 +253,24 @@ export default function Prediction() {
           <Button type="submit" className="w-full">Calcular Risco</Button>
         </form>
         {result && (
-          <div className="mt-4 p-4 bg-blue-100 rounded">
-            <p className="font-bold">Resultado: Risco de {result.probability}</p>
-            <p>Categoria de Risco: {result.risk_category}</p>
-            <p className="mt-2">{result.bp_recommendation}</p>
-            <p className="mt-2">{result.bmi_recommendation}</p>
-            <p className="mt-2">{result.chol_recommendation}</p>
-            <p className="mt-2">{result.gluc_recommendation}</p>
+          <div className="mt-8 p-6 bg-blue-100 border-l-4 border-blue-500 rounded-xl shadow">
+              <h2 className="text-xl font-bold text-blue-800 mb-2">Resultado da Predição</h2>
+              <p className="font-medium text-gray-700">
+                Probabilidade: <span className={`${getRiskColor(result.risk_category)} font-bold`}>{result.probability}</span>
+              </p>
+              <p className="text-gray-700">Categoria: <strong>{result.risk_category}</strong></p>
+            <div className="mt-4 space-y-2 text-sm text-gray-700">
+              <p className="mt-2">{result.bp_recommendation}</p>
+              <p className="mt-2">{result.bmi_recommendation}</p>
+              <p className="mt-2">{result.chol_recommendation}</p>
+              <p className="mt-2">{result.gluc_recommendation}</p>
+            </div>
           </div>
         )}
       </CardContent>
     </Card>
+   </div>
+  </div>
   )
 }
 

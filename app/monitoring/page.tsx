@@ -111,33 +111,53 @@ export default function Monitoring() {
   }
 
   if (!session) {
-    return <div>Please sign in to view your health monitoring data.</div>
+   return <div className="text-center mt-20 text-lg">Faça login para acessar seus dados de saúde.</div>
   }
 
   return (
-    <div className="container mx-auto p-4 space-y-8">
-      <h1 className="text-3xl font-bold mb-4">Monitoramento de Saúde</h1>
+   <div className="container mx-auto p-6 space-y-10 bg-gradient-to-br from-white to-blue-50">
+      <div className="text-center">
+        <h1 className="text-4xl font-bold text-primary mb-2">Monitoramento de Saúde</h1>
+        <p className="text-muted-foreground">Acompanhe sua saúde em tempo real e compartilhe com profissionais.</p>
+      </div>
 
-      <DataSourceSelector onGoogleFitAuth={handleGoogleFitAuth} isGoogleFitConnected={isGoogleFitConnected} />
+      <Card className="p-4 shadow-md border border-muted rounded-2xl border-primary/40 rounded-lg">
+        <CardHeader>
+          <CardTitle className="text-lg">Fontes de Dados</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <DataSourceSelector
+            onGoogleFitAuth={handleGoogleFitAuth}
+            isGoogleFitConnected={isGoogleFitConnected}
+          />
+        </CardContent>
+      </Card>
 
-      <HealthDataInput onSubmit={handleNewData} />
+      <Card className="p-4 shadow-md border border-muted rounded-2xl border-primary/40 rounded-lg">
+        <CardHeader>
+          <CardTitle className="text-lg">Inserir Dados Manualmente</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <HealthDataInput onSubmit={handleNewData} />
+        </CardContent>
+      </Card>
 
-      {isLoading ? (
-        <div>Carregando dados de saúde...</div>
-      ) : (
-        <Card>
-          <CardHeader>
-            <CardTitle>Seus Dados de Saúde</CardTitle>
-          </CardHeader>
-          <CardContent>
+      <Card className="p-4 shadow-md border border-muted rounded-2xl border-primary/40 rounded-lg">
+        <CardHeader>
+          <CardTitle className="text-lg">Visualização dos Dados</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <p className="text-center text-sm text-muted-foreground">Carregando dados de saúde...</p>
+          ) : healthData.length === 0 ? (
+            <p className="text-center text-sm text-muted-foreground">Nenhum dado de saúde disponível.</p>
+          ) : (
             <HealthDataChart data={healthData} />
-          </CardContent>
-        </Card>
-      )}
+          )}
+        </CardContent>
+      </Card>
 
       <ShareHealthData />
     </div>
   )
 }
-
-

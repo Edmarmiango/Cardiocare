@@ -12,6 +12,7 @@ import { Upload } from 'lucide-react'
 import { useToast } from "../../components/ui/use-toast"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select"
 
+
 export default function RegisterPage() {
  const [name, setName] = useState('')
  const [email, setEmail] = useState('')
@@ -143,11 +144,11 @@ export default function RegisterPage() {
 }
 
  return (
-   <div className="min-h-screen py-8 px-4">
-     <div className="container mx-auto flex items-center justify-center">
-       <Card className="w-full max-w-md">
+   <div className="flex items-center justify-center min-h-screen py-8 px-4 bg-blue-50">
+    <div className="container mx-auto flex items-center justify-center">
+       <Card className="w-full bg-white border border-primary/20 rounded-2xl shadow-md p-6">
          <CardHeader>
-           <CardTitle>Registro</CardTitle>
+           <CardTitle>Inscrever-se</CardTitle>
          </CardHeader>
          <CardContent>
            <form onSubmit={handleSubmit} className="space-y-4">
@@ -157,7 +158,7 @@ export default function RegisterPage() {
                 <AlertDescription>{successMessage}</AlertDescription>
               </Alert>
             )}
-             <div className="space-y-2">
+             <div className="space-y-2 ">
                <Label htmlFor="name">Nome</Label>
                <Input
                  id="name"
@@ -165,6 +166,7 @@ export default function RegisterPage() {
                  value={name}
                  onChange={(e) => setName(e.target.value)}
                  required
+                 className="w-full px-4 py-2 border border-primary/40 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition"
                />
              </div>
              <div className="space-y-2">
@@ -175,6 +177,7 @@ export default function RegisterPage() {
                  value={email}
                  onChange={(e) => setEmail(e.target.value)}
                  required
+                 className="w-full px-4 py-2 border border-primary/40 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition"
                />
              </div>
              <div className="space-y-2">
@@ -185,6 +188,7 @@ export default function RegisterPage() {
                  value={password}
                  onChange={(e) => setPassword(e.target.value)}
                  required
+                 className="w-full px-4 py-2 border border-primary/40 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition"
                />
              </div>
              <div className="space-y-2">
@@ -195,6 +199,7 @@ export default function RegisterPage() {
                  value={dateOfBirth}
                  onChange={(e) => setDateOfBirth(e.target.value)}
                  required
+                 className="w-full px-4 py-2 border border-primary/40 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition"
                />
              </div>
              <div>
@@ -216,6 +221,7 @@ export default function RegisterPage() {
                 value={address} 
                 onChange={(e) => setAddress(e.target.value)} 
                 required 
+                 className="w-full px-4 py-2 border border-primary/40 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition"
               />
             </div>
             <div className="space-y-2">
@@ -225,16 +231,17 @@ export default function RegisterPage() {
                 type="tel" 
                 value={phoneNumber} onChange={(e) => setphoneNumber(e.target.value)} 
                 required 
+                 className="w-full px-4 py-2 border border-primary/40 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition"
               />
             </div>
              <div className="space-y-2">
                <Label>Tipo de Usuário</Label>
                <RadioGroup value={userType} onValueChange={setUserType}>
-                 <div className="flex items-center space-x-2">
+                 <div className="flex items-center space-x-2 cursor-pointer">
                    <RadioGroupItem value="PATIENT" id="patient" />
                    <Label htmlFor="patient">Paciente</Label>
                  </div>
-                 <div className="flex items-center space-x-2">
+                 <div className="flex items-center space-x-2 cursor-pointer">
                    <RadioGroupItem value="DOCTOR" id="doctor" />
                    <Label htmlFor="doctor">Médico</Label>
                  </div>
@@ -250,6 +257,7 @@ export default function RegisterPage() {
                      value={crm}
                      onChange={(e) => setCrm(e.target.value)}
                      required
+                      className="w-full px-4 py-2 border border-primary/40 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition"
                    />
                  </div>
                  <div className="space-y-2">
@@ -260,6 +268,7 @@ export default function RegisterPage() {
                      value={specialty}
                      onChange={(e) => setSpecialty(e.target.value)}
                      required
+                      className="w-full px-4 py-2 border border-primary/40 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition"
                    />
                  </div>
                 
@@ -280,7 +289,8 @@ export default function RegisterPage() {
                        type="button"
                        variant="outline"
                        onClick={() => document.getElementById('profileImage')?.click()}
-                       className="w-full"
+                       className="w-full px-4 py-2 border border-primary/40 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition"
+                       
                      >
                        <Upload className="mr-2 h-4 w-4" />
                        {profileImage ? 'Trocar Imagem' : 'Carregar Imagem'}
@@ -300,6 +310,7 @@ export default function RegisterPage() {
                  value={bi}
                  onChange={(e) => setBi(e.target.value)}
                  required
+                 className="w-full px-4 py-2 border border-primary/40 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition"
                />
              </div>
              {feedback && (
@@ -314,7 +325,7 @@ export default function RegisterPage() {
            </form>
          </CardContent>
        </Card>
-     </div>
+      </div>
    </div>
  )
 }

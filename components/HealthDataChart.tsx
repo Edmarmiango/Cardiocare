@@ -1,25 +1,19 @@
 "use client"
 
-import { useState, useMemo } from "react"
-import { Line } from "react-chartjs-2"
 import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  Title,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
   Tooltip,
   Legend,
-  type ChartOptions,
-} from "chart.js"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select"
-import { startOfDay, startOfWeek, startOfMonth, startOfYear, isAfter } from "date-fns"
-import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card"
-import { format, parseISO } from "date-fns"
-import { ptBR } from "date-fns/locale"
-
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend)
+  ResponsiveContainer,
+} from "recharts"
+import { Badge } from "./ui/badge"
+import { useMemo, useState } from "react"
+import { startOfDay, startOfWeek, startOfMonth, startOfYear, isAfter, parseISO } from "date-fns"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select"
 
 interface HealthData {
   date: string
@@ -28,7 +22,7 @@ interface HealthData {
   heartRate?: number
   glucose?: number
   cholesterol?: number
-  source?: "manual" | "googleFit"
+  source?: string
 }
 
 interface HealthDataChartProps {
@@ -37,134 +31,93 @@ interface HealthDataChartProps {
 
 type TimePeriod = "day" | "week" | "month" | "year" | "all"
 
-const formatDate = (dateString: string) => {
-  const date = parseISO(dateString)
-  return format(date, "dd/MM/yyyy", { locale: ptBR })
-}
-
 export function HealthDataChart({ data }: HealthDataChartProps) {
-  // Ensure all data points have all fields, even if they're undefined
-  const normalizedData = data.map((item) => ({
-    date: item.date,
-    systolic: item.systolic ?? undefined,
-    diastolic: item.diastolic ?? undefined,
-    heartRate: item.heartRate ?? undefined,
-    glucose: item.glucose ?? undefined,
-    cholesterol: item.cholesterol ?? undefined,
-    source: item.source,
-  }))
-
   const [timePeriod, setTimePeriod] = useState<TimePeriod>("all")
 
-  const aggregateData = (
-    data: HealthData[],
-  ): {
-    bloodPressure: HealthData[]
-    glucose: HealthData[]
-    cholesterol: HealthData[]
-  } => {
-    return data.reduce(
-      (acc, item) => {
-        if (item.systolic || item.diastolic || item.heartRate) {
-          acc.bloodPressure.push(item)
+  const groupedData = useMemo(() => {
+    const filtered = filterDataByTimePeriod(data, timePeriod)
+    const grouped = new Map<string, HealthData[]>()
+
+    // Agrupar dados por data (YYYY-MM-DD)
+    for (const entry of filtered) {
+      const date = new Date(entry.date)
+      const formatted = date.toLocaleDateString("en-CA")
+
+      if (!grouped.has(formatted)) {
+        grouped.set(formatted, [entry])
+      } else {
+        grouped.get(formatted)!.push(entry)
+      }
+    }
+
+    // Média dos dados por dia
+    const averaged = Array.from(grouped.entries()).map(([date, entries]) => {
+      const total = {
+        systolic: 0,
+        diastolic: 0,
+        heartRate: 0,
+        glucose: 0,
+        cholesterol: 0,
+      }
+      const counts = {
+        systolic: 0,
+        diastolic: 0,
+        heartRate: 0,
+        glucose: 0,
+        cholesterol: 0,
+      }
+
+      for (const entry of entries) {
+        if (typeof entry.systolic === "number") {
+          total.systolic += entry.systolic
+          counts.systolic++
         }
-        if (item.glucose) {
-          acc.glucose.push(item)
+        if (typeof entry.diastolic === "number") {
+          total.diastolic += entry.diastolic
+          counts.diastolic++
         }
-        if (item.cholesterol) {
-          acc.cholesterol.push(item)
+        if (typeof entry.heartRate === "number") {
+          total.heartRate += entry.heartRate
+          counts.heartRate++
         }
-        return acc
-      },
-      { bloodPressure: [], glucose: [], cholesterol: [] },
+        if (typeof entry.glucose === "number") {
+          total.glucose += entry.glucose
+          counts.glucose++
+        }
+        if (typeof entry.cholesterol === "number") {
+          total.cholesterol += entry.cholesterol
+          counts.cholesterol++
+        }
+      }
+
+      return {
+        date,
+        formattedDate: new Date(date).toLocaleDateString("pt-BR", {
+          day: "2-digit",
+          month: "short",
+        }),
+         systolic: counts.systolic ? total.systolic / counts.systolic : null,
+         diastolic: counts.diastolic ? total.diastolic / counts.diastolic : null,
+         heartRate: counts.heartRate ? total.heartRate / counts.heartRate : null,
+         glucose: counts.glucose ? total.glucose / counts.glucose : null,
+         cholesterol: counts.cholesterol ? total.cholesterol / counts.cholesterol : null,
+      }
+    })
+
+    return averaged.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+  }, [data, timePeriod])
+
+  if (!data || data.length === 0) {
+    return (
+      <div className="text-sm text-muted-foreground text-center">
+        Nenhum dado disponível para exibir.
+      </div>
     )
-  }
-
-  const filteredData = useMemo(() => {
-    const filtered = filterDataByTimePeriod(normalizedData, timePeriod)
-    return aggregateData(filtered)
-  }, [normalizedData, timePeriod, aggregateData]) // Added aggregateData to dependencies
-
-  const options: ChartOptions<"line"> = {
-    responsive: true,
-    plugins: {
-      legend: {
-        position: "top" as const,
-      },
-      tooltip: {
-        mode: "index",
-        intersect: false,
-      },
-    },
-    scales: {
-      x: {
-        type: "category",
-        title: {
-          display: true,
-          text: "Data",
-        },
-      },
-      y: {
-        beginAtZero: true,
-        title: {
-          display: true,
-          text: "Valor",
-        },
-      },
-    },
-  }
-
-  const bloodPressureChartData = {
-    labels: filteredData.bloodPressure.map((item) => formatDate(item.date)),
-    datasets: [
-      {
-        label: "Pressão Sistólica",
-        data: filteredData.bloodPressure.map((item) => item.systolic || null),
-        borderColor: "rgb(255, 99, 132)",
-        backgroundColor: "rgba(255, 99, 132, 0.5)",
-      },
-      {
-        label: "Pressão Diastólica",
-        data: filteredData.bloodPressure.map((item) => item.diastolic || null),
-        borderColor: "rgb(53, 162, 235)",
-        backgroundColor: "rgba(53, 162, 235, 0.5)",
-      },
-      {
-        label: "Frequência Cardíaca",
-        data: filteredData.bloodPressure.map((item) => item.heartRate || null),
-        borderColor: "rgb(75, 192, 192)",
-        backgroundColor: "rgba(75, 192, 192, 0.5)",
-      },
-    ],
-  }
-
-  const glucoseChartData = {
-    labels: filteredData.glucose.map((item) => formatDate(item.date)),
-    datasets: [
-      {
-        label: "Glicose",
-        data: filteredData.glucose.map((item) => item.glucose || null),
-        borderColor: "rgb(255, 205, 86)",
-        backgroundColor: "rgba(255, 205, 86, 0.5)",
-      },
-    ],
-  }
-
-  const cholesterolChartData = {
-    labels: filteredData.cholesterol.map((item) => formatDate(item.date)),
-    datasets: [
-      {
-        label: "Colesterol",
-        data: filteredData.cholesterol.map((item) => item.cholesterol || null),
-        borderColor: "rgb(153, 102, 255)",
-        backgroundColor: "rgba(153, 102, 255, 0.5)",
-      },
-    ],
   }
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-end">
+      <div className="flex justify-between items-center">
         <Select value={timePeriod} onValueChange={(value: TimePeriod) => setTimePeriod(value)}>
           <SelectTrigger className="w-[180px]">
             <SelectValue placeholder="Selecione o período" />
@@ -178,63 +131,42 @@ export function HealthDataChart({ data }: HealthDataChartProps) {
           </SelectContent>
         </Select>
       </div>
-      {filteredData.bloodPressure.length > 0 ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>Pressão Arterial e Frequência Cardíaca</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Line options={options} data={bloodPressureChartData} />
-          </CardContent>
-        </Card>
-      ) : (
-        <Card>
-          <CardHeader>
-            <CardTitle>Pressão Arterial e Frequência Cardíaca</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p>Nenhum dado disponível para o período selecionado.</p>
-          </CardContent>
-        </Card>
-      )}
-      {filteredData.glucose.length > 0 ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>Glicose</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Line options={options} data={glucoseChartData} />
-          </CardContent>
-        </Card>
-      ) : (
-        <Card>
-          <CardHeader>
-            <CardTitle>Glicose</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p>Nenhum dado disponível para o período selecionado.</p>
-          </CardContent>
-        </Card>
-      )}
-      {filteredData.cholesterol.length > 0 ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>Colesterol</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Line options={options} data={cholesterolChartData} />
-          </CardContent>
-        </Card>
-      ) : (
-        <Card>
-          <CardHeader>
-            <CardTitle>Colesterol</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p>Nenhum dado disponível para o período selecionado.</p>
-          </CardContent>
-        </Card>
-      )}
+
+      <div className="flex flex-wrap gap-2 text-sm">
+        <Badge variant="outline" className="bg-blue-100 text-blue-800">Sistólica</Badge>
+        <Badge variant="outline" className="bg-sky-100 text-sky-800">Diastólica</Badge>
+        <Badge variant="outline" className="bg-red-100 text-red-800">Frequência Cardíaca</Badge>
+        <Badge variant="outline" className="bg-yellow-100 text-yellow-800">Glicose</Badge>
+        <Badge variant="outline" className="bg-green-100 text-green-800">Colesterol</Badge>
+      </div>
+
+      <div className="health-chart-container w-full h-[350px]">
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart data={groupedData}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+            <XAxis dataKey="formattedDate" tick={{ fontSize: 12 }} />
+            <YAxis />
+            <Tooltip
+              contentStyle={{ backgroundColor: "#fff", borderRadius: "8px", border: "1px solid #ccc" }}
+              labelStyle={{ fontWeight: "bold" }}
+            />
+            <Legend wrapperStyle={{ fontSize: 12 }} />
+            <Line type="linear" dataKey="systolic" name="Sistólica" stroke="#3b82f6" strokeWidth={2} dot={{ r: 2 }} connectNulls={false}/>
+            <Line type="linear" dataKey="diastolic" name="Diastólica" stroke="#0ea5e9" strokeWidth={2} dot={{ r: 2 }} connectNulls={false}/>
+            <Line type="linear" dataKey="heartRate" name="Frequência Cardíaca" stroke="#ef4444" strokeWidth={2} dot={{ r: 2 }} connectNulls={false}/>
+            <Line type="linear" dataKey="glucose" name="Glicose" stroke="#facc15" strokeWidth={2} dot={{ r: 2 }} connectNulls={false} />
+            <Line type="linear" dataKey="cholesterol" name="Colesterol" stroke="#22c55e" strokeWidth={2} dot={{ r: 2 }} connectNulls={false} />
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+
+      <div className="text-xs text-muted-foreground">
+        Fonte dos dados:
+        {" "}
+        <Badge variant="outline" className="ml-1">Manual</Badge>
+        {" "}
+        <Badge variant="outline" className="ml-1 bg-gray-200 text-gray-800">Google Fit</Badge>
+      </div>
     </div>
   )
 }
@@ -262,4 +194,3 @@ function filterDataByTimePeriod(data: HealthData[], timePeriod: TimePeriod) {
 
   return data.filter((item) => isAfter(parseISO(item.date), startDate))
 }
-

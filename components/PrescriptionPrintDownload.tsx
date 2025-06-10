@@ -177,6 +177,25 @@ export function PrescriptionPrintDownload({ prescriptions }: PrescriptionPrintDo
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              id="selectAll"
+              checked={selectedPrescriptions.length === prescriptions.length && prescriptions.length > 0}
+              onCheckedChange={(checked) => {
+                if (checked) {
+                  setSelectedPrescriptions(prescriptions.map((p) => p.id))
+                } else {
+                  setSelectedPrescriptions([])
+                }
+              }}
+            />
+            <label
+              htmlFor="selectAll"
+              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+            >
+              Selecionar Tudo
+            </label>
+          </div>
           {prescriptions.map((prescription) => (
             <div key={prescription.id} className="flex items-center space-x-2">
               <Checkbox

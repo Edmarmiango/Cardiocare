@@ -97,7 +97,7 @@ const renderAvatar = () => {
  // Renderiza navegação específica para admin
  if (session?.user?.role === 'ADMIN') {
    return (
-     <header className="w-full border-b">
+     <header className="w-full border-b bg-primary text-primary-foreground shadow-sm">
        <div className="container mx-auto flex h-16 items-center justify-between px-4">
          <Link href="/admin/dashboard" className="flex items-center">
            <span className="text-2xl font-bold">CardioCare</span>
@@ -137,7 +137,7 @@ const renderAvatar = () => {
  // Renderiza navegação para médicos
  if (session?.user?.role === 'DOCTOR') {
  return (
-   <header className="w-full border-b">
+   <header className="w-full border-b bg-primary text-primary-foreground shadow-sm">
      <div className="container mx-auto flex h-16 items-center justify-between px-4">
        <Link href="/" className="flex items-center">
          <span className="text-2xl font-bold">CardioCare</span>
@@ -207,12 +207,10 @@ const renderAvatar = () => {
            </>
          ) : (
            <>
-             <Button variant="ghost" asChild>
-               <Link href="/register">Registrar-se</Link>
-             </Button>
-             <Button variant="outline" asChild>
-               <Link href="/login">Entrar</Link>
-             </Button>
+             
+              <Link className="text-sm font-medium" href="/register">Registrar-se</Link>
+               <Link className="text-sm font-medium" href="/login">Entrar</Link>
+            
            </>
          )}
        </nav>
@@ -223,7 +221,7 @@ const renderAvatar = () => {
 
  // Renderiza navegação para paciente
  return (
-  <header className="w-full border-b">
+  <header className="w-full border-b bg-primary text-primary-foreground shadow-sm">
     <div className="container mx-auto flex h-16 items-center justify-between px-4">
       <Link href="/" className="flex items-center">
         <span className="text-2xl font-bold">CardioCare</span>
@@ -291,12 +289,10 @@ const renderAvatar = () => {
           </>
         ) : (
           <>
-            <Button variant="ghost" asChild>
-              <Link href="/register">Registrar-se</Link>
-            </Button>
-            <Button variant="outline" asChild>
-              <Link href="/login">Entrar</Link>
-            </Button>
+            
+              <Link href="/register" className="text-sm font-medium">Registrar-se</Link>
+              <Link href="/login" className="text-sm font-medium">Entrar</Link>
+         
           </>
         )}
       </nav>
